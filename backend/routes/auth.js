@@ -59,4 +59,51 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// Get logged-in user profile
+const auth = require('../middleware/auth');
+router.get('/profile', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json(user);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Update user profile
+router.put('/profile', auth, async (req, res) => {
+    const { name, phone, companyName } = req.body;
+
+    try {
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (name) user.name = name;
+        if (companyName !== undefined) user.companyName = companyName;
+        if (phone) {
+            // Check if another user has this phone number
+            if (phone !== user.phone) {
+                const existingUser = await User.findOne({ phone });
+                if (existingUser) {
+                    return res.status(400).json({ message: 'Phone number already in use' });
+                }
+                user.phone = phone;
+            }
+        }
+
+        await user.save();
+        res.json({ userId: user._id, name: user.name, phone: user.phone, companyName: user.companyName });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;
+

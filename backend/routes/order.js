@@ -84,4 +84,43 @@ router.patch('/:id/status', auth, async (req, res) => {
     }
 });
 
+// Update an order (measurements, notes)
+router.put('/:id', auth, async (req, res) => {
+    const { measurements, notes } = req.body;
+
+    try {
+        const order = await Order.findOne({ _id: req.params.id, createdBy: req.user.userId })
+            .populate('customer')
+            .populate('design');
+
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        if (measurements) order.measurements = measurements;
+        if (notes !== undefined) order.notes = notes;
+
+        await order.save();
+        res.json(order);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete an order
+router.delete('/:id', auth, async (req, res) => {
+    try {
+        const order = await Order.findOneAndDelete({ _id: req.params.id, createdBy: req.user.userId });
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+        res.json({ message: 'Order deleted successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;
+

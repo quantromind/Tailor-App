@@ -66,4 +66,40 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
+// Update a customer
+router.put('/:id', auth, async (req, res) => {
+    const { name, phone } = req.body;
+
+    try {
+        const customer = await Customer.findOne({ _id: req.params.id, createdBy: req.user.userId });
+        if (!customer) {
+            return res.status(404).json({ message: 'Customer not found' });
+        }
+
+        if (name) customer.name = name;
+        if (phone) customer.phone = phone;
+
+        await customer.save();
+        res.json(customer);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete a customer
+router.delete('/:id', auth, async (req, res) => {
+    try {
+        const customer = await Customer.findOneAndDelete({ _id: req.params.id, createdBy: req.user.userId });
+        if (!customer) {
+            return res.status(404).json({ message: 'Customer not found' });
+        }
+        res.json({ message: 'Customer deleted successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;
+

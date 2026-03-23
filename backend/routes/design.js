@@ -62,4 +62,43 @@ router.get('/:category/all', auth, async (req, res) => {
     }
 });
 
+// Update a custom design
+router.put('/custom/:id', auth, async (req, res) => {
+    const { name, category, image, description, measurements } = req.body;
+
+    try {
+        const design = await Design.findOne({ _id: req.params.id, createdBy: req.user.userId, isCustom: true });
+        if (!design) {
+            return res.status(404).json({ message: 'Custom design not found' });
+        }
+
+        if (name) design.name = name;
+        if (category) design.category = category.toLowerCase();
+        if (image !== undefined) design.image = image;
+        if (description !== undefined) design.description = description;
+        if (measurements) design.measurements = measurements;
+
+        await design.save();
+        res.json(design);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete a custom design
+router.delete('/custom/:id', auth, async (req, res) => {
+    try {
+        const design = await Design.findOneAndDelete({ _id: req.params.id, createdBy: req.user.userId, isCustom: true });
+        if (!design) {
+            return res.status(404).json({ message: 'Custom design not found' });
+        }
+        res.json({ message: 'Custom design deleted successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;
+
