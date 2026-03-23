@@ -1,0 +1,177 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useTranslation } from 'react-i18next';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MeasurementInput } from '../../../src/components/MeasurementInput';
+import { Colors, Typography } from '../../../src/constants/colors';
+import { calculatePrice } from '../../../src/utils/priceCalculator';
+
+export default function ShirtMeasurementScreen({ route, navigation }: any) {
+  const { t } = useTranslation();
+  const clientData = route.params?.client;
+  const item = route.params?.item || { name: 'Shirt', type: 'Shirt' };
+  
+  const [clientName, setClientName] = useState(clientData?.name || '');
+  const [phone, setPhone] = useState(clientData?.phone || '');
+  const [measurements, setMeasurements] = useState<Record<string, string>>({
+    length: clientData?.measurements?.length || '',
+    chest: clientData?.measurements?.chest || '',
+    stomach: clientData?.measurements?.stomach || '',
+    hip: clientData?.measurements?.hip || '',
+    shoulder: clientData?.measurements?.shoulder || '',
+    sleeve: clientData?.measurements?.sleeve || '',
+    cuffLength: clientData?.measurements?.cuffLength || '',
+    cuffWidth: clientData?.measurements?.cuffWidth || '',
+    neck: clientData?.measurements?.neck || '',
+  });
+  const [newMeasName, setNewMeasName] = useState('');
+  const [newMeasValue, setNewMeasValue] = useState('');
+  const [showAddFields, setShowAddFields] = useState(false);
+
+  const updateMeasurement = (key: string, value: string) => {
+    setMeasurements(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleAddNewMeasurement = () => {
+    const name = newMeasName.trim();
+    const value = newMeasValue.trim();
+    if (name && !measurements.hasOwnProperty(name)) {
+      setMeasurements(prev => ({ ...prev, [name]: value }));
+      setNewMeasName('');
+      setNewMeasValue('');
+    }
+  };
+
+  const handleCalculateBill = () => {
+    if (!clientName || !phone) { Alert.alert('Error', t('error_fill_fields')); return; }
+    if (!/^\d{10}$/.test(phone)) { Alert.alert('Error', 'Please enter a valid 10-digit phone number'); return; }
+    const price = calculatePrice('Shirt');
+    navigation.navigate('BillPreview', {
+      billData: { 
+        clientName, phone, item: item.name, type: 'Shirt', gender: route.params?.gender || 'male',
+        measurements, price, deliveryDate: new Date(Date.now() + 7 * 86400000).toLocaleDateString() 
+      },
+    });
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={{ flex: 1 }}>
+      <LinearGradient 
+        colors={Colors.gradientPrimary as [string, string]} 
+        style={styles.headerGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back-outline" size={24} color={Colors.textDark} />
+        </TouchableOpacity>
+        <Text style={styles.title}>{item.name} {t('finalize_design')}</Text>
+        <View style={{ width: 32 }} />
+      </LinearGradient>
+
+      <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" enableOnAndroid={true} keyboardOpeningTime={0}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('client_details')}</Text>
+          <TextInput style={styles.input} placeholder={t('client_name_placeholder')} value={clientName} onChangeText={setClientName} placeholderTextColor={Colors.textLight} />
+          <TextInput style={styles.input} placeholder={t('phone_placeholder')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" maxLength={10} placeholderTextColor={Colors.textLight} />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('bespoke_measurements')}</Text>
+          <View style={styles.inputGrid}>
+            {Object.entries(measurements).map(([key, value]) => (
+              <View style={styles.gridItem} key={key}>
+                <MeasurementInput 
+                  label={key.charAt(0).toUpperCase() + key.slice(1)} 
+                  value={value} 
+                  onChangeText={(v: string) => updateMeasurement(key, v)} 
+                />
+              </View>
+            ))}
+          </View>
+          
+          {!showAddFields ? (
+            <TouchableOpacity onPress={() => setShowAddFields(true)} style={styles.showAddBtn}>
+              <Ionicons name="add-circle-outline" size={20} color={Colors.primary} />
+              <Text style={styles.showAddBtnText}>Add Custom Measurement</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.addMeasRow}>
+              <TextInput
+                style={[styles.input, { flex: 2, marginBottom: 0 }]}
+                placeholder="Name (e.g. Cuffs)"
+                value={newMeasName}
+                onChangeText={setNewMeasName}
+                placeholderTextColor={Colors.textLight}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                placeholder="Value"
+                value={newMeasValue}
+                onChangeText={setNewMeasValue}
+                keyboardType="numeric"
+                placeholderTextColor={Colors.textLight}
+              />
+              <TouchableOpacity onPress={() => { handleAddNewMeasurement(); setShowAddFields(false); }} style={styles.addMeasBtn}>
+                <Ionicons name="checkmark" size={24} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity onPress={handleCalculateBill} activeOpacity={0.85} style={styles.calculateBtn}>
+          <LinearGradient 
+            colors={Colors.gradientSecondary as [string, string]} 
+            style={styles.calculateGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons name="sparkles-outline" size={22} color="#FFFFFF" />
+            <Text style={styles.calculateBtnText}>{t('finalize_design')}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </KeyboardAwareScrollView>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  headerGradient: { 
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
+    paddingHorizontal: 20, paddingVertical: 24, 
+    borderBottomLeftRadius: 32, borderBottomRightRadius: 32,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(52, 78, 65, 0.05)'
+  },
+  backBtn: { padding: 4 },
+  title: { fontSize: 26, fontFamily: Typography.fashionBold, color: Colors.textDark, letterSpacing: -0.5 },
+  content: { padding: 20, paddingBottom: 60 },
+  section: { 
+    marginBottom: 24, backgroundColor: Colors.surface, padding: 22, borderRadius: 24, 
+    borderWidth: 1, borderColor: Colors.border,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10,
+  },
+  sectionTitle: { 
+    fontSize: 13, fontWeight: '800', color: Colors.primary, 
+    marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1.5 
+  },
+  input: { 
+    backgroundColor: Colors.surfaceAlt, borderWidth: 1, borderColor: Colors.border, 
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, 
+    color: Colors.textDark, marginBottom: 16, fontWeight: '600' 
+  },
+  inputGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
+  gridItem: { width: '50%', paddingHorizontal: 5, paddingVertical: 5 },
+  showAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: 'rgba(52, 78, 65, 0.05)', borderRadius: 12, alignSelf: 'flex-start' },
+  showAddBtnText: { color: Colors.primary, fontSize: 13, fontWeight: '700' },
+  addMeasRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  addMeasBtn: { backgroundColor: Colors.primary, paddingHorizontal: 16, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  calculateBtn: { borderRadius: 16, overflow: 'hidden', marginTop: 10, elevation: 4 },
+  calculateGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 10 },
+  calculateBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+});
