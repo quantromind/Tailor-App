@@ -1,152 +1,160 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator, Modal } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
+import { getOrdersByCustomer, updateCustomer, updateOrder } from '../../../api';
 
 export default function ClientDetailScreen({ route, navigation }: any) {
   const { t } = useTranslation();
-  const { client, targetOrderId } = route.params;
-  const initialName = client.name || client.clientName;
-  const initialPhone = client.phone || '';
+  const { client, customerId, targetOrderId } = route.params;
+  const clientId = customerId || client?._id || client?.id;
+  const initialName = client?.name || client?.clientName || '';
+  const initialPhone = client?.phone || '';
 
   const [isEditing, setIsEditing] = useState(false);
-  const [isEditingPersonal, setIsEditingPersonal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editedName, setEditedName] = useState(initialName);
   const [editedPhone, setEditedPhone] = useState(initialPhone);
-  const [measurements, setMeasurements] = useState<Record<string, string>>(client.measurements || {});
+  const [editedGender, setEditedGender] = useState<'male' | 'female' | 'kids'>(client?.gender || 'male');
+  
   const [clientOrders, setClientOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'date' | 'pending' | 'completed'>('date');
 
-  const receiptHtml = `
-    <html><head><style>
-      body { font-family: 'Helvetica'; padding: 40px; background-color: #F8F9F5; color: #344E41; }
-      .container { max-width: 600px; margin: auto; border: 1px solid #EDF1E4; border-radius: 20px; padding: 30px; background-color: #FFFFFF; box-shadow: 0 4px 20px rgba(52, 78, 65, 0.05); }
-      h1 { text-align: center; color: #344E41; margin-bottom: 4px; font-weight: 800; letter-spacing: 2px; }
-      .sub { text-align: center; color: #6B705C; margin-bottom: 30px; text-transform: uppercase; font-size: 11px; letter-spacing: 3px; font-weight: 700; }
-      .section { border-bottom: 1px solid #EDF1E4; padding: 15px 0; }
-      .st { font-weight: 800; color: #344E41; margin-bottom: 10px; text-transform: uppercase; font-size: 11px; letter-spacing: 1.5px; }
-      .row { display: flex; justify-content: space-between; padding: 8px 0; }
-      .l { color: #6B705C; font-size: 14px; }
-      .v { font-weight: 700; color: #344E41; font-size: 14px; }
-      .total-row { display: flex; justify-content: space-between; margin-top: 25px; padding-top: 20px; border-top: 2px dashed #A3B18A; }
-      .total-label { font-size: 20px; font-weight: 800; }
-      .total-val { font-size: 26px; font-weight: 900; color: #344E41; }
-      .meas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
-      .meas-item { background: #F8F9F5; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #EDF1E4; }
-      .meas-val { font-weight: 800; font-size: 14px; display: block; color: #344E41; }
-      .meas-lab { font-size: 9px; color: #6B705C; text-transform: uppercase; margin-top: 2px; font-weight: 700; }
-    </style></head><body>
-      <div class="container">
-        <h1>${t('receipt_header')}</h1><div class="sub">${t('receipt_sub')}</div>
-        <div class="section"><div class="st">${t('client_info')}</div>
-          <div class="row"><span class="l">${t('full_name_label').replace(' *', '')}</span><span class="v">${editedName}</span></div>
-          <div class="row"><span class="l">${t('phone_placeholder')}</span><span class="v">${editedPhone || '—'}</span></div>
-        </div>
-        <div class="section"><div class="st">${t('order_info')}</div>
-          <div class="row"><span class="l">${t('category')}</span><span class="v">${client.item}</span></div>
-          <div class="row"><span class="l">Status</span><span class="v">${client.status === 'Completed' ? t('filter_completed') : t('filter_pending')}</span></div>
-          ${client.deliveryDate ? `<div class="row"><span class="l">${t('handover_date')}</span><span class="v">${client.deliveryDate}</span></div>` : ''}
-        </div>
-        ${Object.keys(measurements).length > 0 ? `
-          <div class="section"><div class="st">${t('precision_measurements')}</div>
-            <div class="meas-grid">
-              ${Object.entries(measurements).filter(([_, v]) => v !== '').map(([k, v]) => `
-                <div class="meas-item"><span class="meas-val">${v}"</span><span class="meas-lab">${k}</span></div>
-              `).join('')}
-            </div>
-          </div>` : ''}
-        <div class="total-row"><span class="total-label">${t('grand_total')}</span><span class="total-val">₹${client.price}</span></div>
-      </div>
-    </body></html>`;
+  // Order editing state
+  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [editOrderStatus, setEditOrderStatus] = useState('');
+  const [editOrderPrice, setEditOrderPrice] = useState('');
+  const [editOrderDate, setEditOrderDate] = useState('');
+  const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     loadClientOrders();
-  }, [editedPhone]);
+  }, [clientId]);
 
   const loadClientOrders = async () => {
-    const data = await AsyncStorage.getItem('@orders');
-    if (data) {
-      const orders = JSON.parse(data);
-      const filtered = orders.filter((o: any) => o.phone === initialPhone || o.phone === editedPhone);
-      setClientOrders(filtered);
+    if (!clientId) {
+      setIsLoading(false);
+      return;
     }
-  };
-
-  const handleSavePersonalData = async () => {
+    setIsLoading(true);
     try {
-      const existing = await AsyncStorage.getItem('@orders');
-      if (existing) {
-        const orders = JSON.parse(existing);
-        const updatedOrders = orders.map((o: any) => {
-          if (o.phone === initialPhone) {
-            return { ...o, name: editedName, clientName: editedName, phone: editedPhone };
-          }
-          return o;
-        });
-        await AsyncStorage.setItem('@orders', JSON.stringify(updatedOrders));
-        Alert.alert(t('success'), t('save_success'));
-        loadClientOrders();
-      }
-      setIsEditingPersonal(false);
+      const orders = await getOrdersByCustomer(clientId);
+      setClientOrders(orders);
     } catch (e) {
-      Alert.alert(t('error_failed_save'), t('save_error'));
+      console.error('Failed to load orders:', e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const sortedOrders = [...clientOrders].sort((a, b) => {
-    if (sortBy === 'pending') return a.status === 'Pending' ? -1 : 1;
-    if (sortBy === 'completed') return a.status === 'Completed' ? -1 : 1;
+  const sortedOrders = [...clientOrders].sort((a: any, b: any) => {
+    if (sortBy === 'pending') return a.status === 'pending' ? -1 : 1;
+    if (sortBy === 'completed') return a.status === 'completed' ? -1 : 1;
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
 
-  const handleShareWhatsApp = (order: any) => {
-    const msg = `*${t('receipt_header')} DETAIL*%0A%0A${t('full_name_label').replace(' *', '')}: ${editedName}%0A${t('category')}: ${order.item}%0A${t('grand_total')}: ₹${order.price}%0A${t('handover_date')}: ${order.deliveryDate || '—'}%0AStatus: ${order.status === 'Completed' ? t('filter_completed') : t('filter_pending')}`;
-    Linking.openURL(`whatsapp://send?text=${msg}`).catch(() => Alert.alert('Error', t('save_error')));
+  const getDesignName = (order: any) => order.design?.name || order.item || 'Unknown';
+  const getPrice = (order: any) => {
+    if (order.price) return order.price.toString();
+    const priceMatch = order.notes?.match(/Price:\s?[₹$€]?\s?(\d+)/i);
+    return priceMatch ? priceMatch[1] : '0';
+  };
+  const getDeliveryDate = (order: any) => {
+    if (order.deliveryDate) {
+      const d = new Date(order.deliveryDate);
+      return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
+    }
+    const dateMatch = order.notes?.match(/Delivery Date:\s?([^,]+)/i);
+    return dateMatch ? dateMatch[1].trim() : '';
   };
 
-  const handleGmail = () => {
-    const subject = encodeURIComponent(`${t('receipt_header')} DETAIL – ${editedName}`);
-    const body = encodeURIComponent(`${t('full_name_label').replace(' *', '')}: ${editedName}\n${t('category')}: ${client.item}\n${t('grand_total')}: ₹${client.price}\n${t('handover_date')}: ${client.deliveryDate || '—'}`);
-    const gmailUrl = `googlegmail:///co?subject=${subject}&body=${body}`;
-    Linking.openURL(gmailUrl).catch(() => {
-      Linking.openURL(`https://mail.google.com/mail/?view=cm&su=${subject}&body=${body}`);
-    });
-  };
+  const handleSaveProfile = async () => {
+    if (!editedName.trim()) { Alert.alert('Error', 'Name is required'); return; }
+    if (!/^\d{10}$/.test(editedPhone)) { Alert.alert('Error', 'Please enter a valid 10-digit phone number'); return; }
 
-  const handlePrint = async () => {
-    try { const { uri } = await Print.printToFileAsync({ html: receiptHtml }); await Print.printAsync({ uri }); } catch (e) { Alert.alert('Error', t('save_error')); }
-  };
-
-  const handleSharePDF = async () => {
-    try { const { uri } = await Print.printToFileAsync({ html: receiptHtml }); await Sharing.shareAsync(uri); } catch (e) { Alert.alert('Error', t('save_error')); }
-  };
-
-  const handleSaveMeasurements = async () => {
+    setIsSaving(true);
     try {
-      const existing = await AsyncStorage.getItem('@orders');
-      if (existing) {
-        const orders = JSON.parse(existing);
-        const updatedOrders = orders.map((o: any) => {
-          if (o.id === client.id) return { ...o, measurements };
-          return o;
-        });
-        await AsyncStorage.setItem('@orders', JSON.stringify(updatedOrders));
-        Alert.alert(t('success'), t('save_success'));
-      }
+      await updateCustomer(clientId, { name: editedName, phone: editedPhone, gender: editedGender });
       setIsEditing(false);
-    } catch (e) {
-      Alert.alert(t('error_failed_save'), t('save_error'));
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const measurementEntries = Object.entries(measurements);
+  const openEditOrderModal = (order: any) => {
+    setEditingOrder(order);
+    setEditOrderStatus(order.status || 'pending');
+    setEditOrderPrice(getPrice(order));
+    setEditOrderDate(getDeliveryDate(order));
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!editingOrder) return;
+    setIsUpdatingOrder(true);
+    try {
+      const data: any = { status: editOrderStatus };
+      
+      if (editOrderPrice !== '') data.price = Number(editOrderPrice);
+      if (editOrderDate !== '') data.deliveryDate = editOrderDate;
+
+      const updated = await updateOrder(editingOrder._id, data);
+      
+      setClientOrders(prev => prev.map(o => o._id === updated._id ? updated : o));
+      setEditingOrder(null);
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.message || 'Failed to update order');
+    } finally {
+      setIsUpdatingOrder(false);
+    }
+  };
+
+  const handleShareWhatsApp = (order: any) => {
+    const designName = getDesignName(order);
+    const price = getPrice(order);
+    const msg = `*${t('receipt_header')} DETAIL*%0A%0A${t('full_name_label').replace(' *', '')}: ${editedName}%0A${t('category')}: ${designName}%0A${t('grand_total')}: ₹${price}%0AStatus: ${order.status}`;
+    Linking.openURL(`whatsapp://send?text=${msg}`).catch(() => Alert.alert('Error', t('save_error')));
+  };
+
+  const handleSharePDF = async (order: any) => {
+    const designName = getDesignName(order);
+    const price = getPrice(order);
+    const measHtml = order.measurements?.map((m: any) => 
+      `<div class="meas-item"><span class="meas-val">${m.value}"</span><span class="meas-lab">${m.name}</span></div>`
+    ).join('') || '';
+
+    const html = `<html><head><style>
+      body { font-family: Helvetica; padding: 40px; background: #F8F9F5; color: #344E41; }
+      .container { max-width: 600px; margin: auto; border: 1px solid #EDF1E4; border-radius: 20px; padding: 30px; background: #FFF; }
+      h1 { text-align: center; font-weight: 800; } .sub { text-align: center; color: #6B705C; margin-bottom: 30px; }
+      .section { border-bottom: 1px solid #EDF1E4; padding: 15px 0; }
+      .row { display: flex; justify-content: space-between; padding: 8px 0; }
+      .l { color: #6B705C; } .v { font-weight: 700; }
+      .meas-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 10px; }
+      .meas-item { background: #F8F9F5; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #EDF1E4; }
+      .meas-val { font-weight: 800; display: block; } .meas-lab { font-size: 9px; color: #6B705C; text-transform: uppercase; }
+      .total-row { display: flex; justify-content: space-between; margin-top: 25px; padding-top: 20px; border-top: 2px dashed #A3B18A; }
+    </style></head><body><div class="container">
+      <h1>${t('receipt_header')}</h1><div class="sub">${t('receipt_sub')}</div>
+      <div class="section"><div class="row"><span class="l">Name</span><span class="v">${editedName}</span></div></div>
+      <div class="section"><div class="row"><span class="l">Design</span><span class="v">${designName}</span></div></div>
+      ${measHtml ? `<div class="section"><div class="meas-grid">${measHtml}</div></div>` : ''}
+      <div class="total-row"><span>Total</span><span style="font-size:22px;font-weight:900">₹${price}</span></div>
+    </div></body></html>`;
+
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri);
+    } catch (e) { Alert.alert('Error', t('save_error')); }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -167,48 +175,73 @@ export default function ClientDetailScreen({ route, navigation }: any) {
         <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} enableOnAndroid={true} keyboardOpeningTime={0}>
           {/* Client info */}
           <View style={styles.card}>
-            <View style={styles.measureHeader}>
-              <Text style={styles.sectionLabel}>{t('client_personal_data')}</Text>
-              {isEditingPersonal ? (
-                <TouchableOpacity onPress={handleSavePersonalData} style={styles.saveBtn}>
-                  <Text style={styles.saveBtnText}>{t('save')}</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={() => setIsEditingPersonal(true)} style={styles.editBtn}>
-                  <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
-                  <Text style={styles.editBtnText}>{t('edit')}</Text>
-                </TouchableOpacity>
-              )}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>{t('client_personal_data')}</Text>
+              <TouchableOpacity onPress={() => isEditing ? handleSaveProfile() : setIsEditing(true)}>
+                {isSaving ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <Text style={{ color: Colors.primary, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    {isEditing ? 'Save' : 'Edit'}
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
+
             <View style={styles.avatarRow}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{editedName?.charAt(0)?.toUpperCase() || '?'}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                {isEditingPersonal ? (
+                {isEditing ? (
                   <>
-                    <TextInput
-                      style={styles.editInput}
-                      value={editedName}
-                      onChangeText={setEditedName}
-                      placeholder={t('client_name_placeholder')}
+                    <TextInput 
+                      style={[styles.input, { marginBottom: 8 }]} 
+                      value={editedName} 
+                      onChangeText={setEditedName} 
+                      placeholder="Client full name" 
                     />
-                    <TextInput
-                      style={styles.editInput}
-                      value={editedPhone}
-                      onChangeText={setEditedPhone}
-                      placeholder={t('phone_placeholder')}
-                      keyboardType="phone-pad"
+                    <TextInput 
+                      style={styles.input} 
+                      value={editedPhone} 
+                      onChangeText={setEditedPhone} 
+                      placeholder="10-digit phone number" 
+                      keyboardType="phone-pad" 
+                      maxLength={10} 
                     />
                   </>
                 ) : (
                   <>
                     <Text style={styles.name}>{editedName}</Text>
                     <Text style={styles.phone}>{editedPhone || t('no_phone')}</Text>
+                    <Text style={[styles.phone, { color: Colors.primary, marginTop: 2 }]}>{(editedGender || '').toUpperCase()}</Text>
                   </>
                 )}
               </View>
             </View>
+
+            {isEditing && (
+              <View style={{ marginTop: 20 }}>
+                <Text style={[styles.sectionLabel, { fontSize: 11, marginBottom: 10 }]}>{t('gender')}</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {(['male', 'female', 'kids'] as const).map(g => (
+                    <TouchableOpacity 
+                      key={g} 
+                      onPress={() => setEditedGender(g)}
+                      style={[
+                        { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', backgroundColor: Colors.surfaceAlt },
+                        editedGender === g && { backgroundColor: Colors.primary, borderColor: Colors.primary }
+                      ]}
+                    >
+                      <Text style={[
+                        { fontSize: 12, fontWeight: '700', color: Colors.textLight },
+                        editedGender === g && { color: '#FFF' }
+                      ]}>{t(`gender_${g}`)}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Sort Selector */}
@@ -222,7 +255,7 @@ export default function ClientDetailScreen({ route, navigation }: any) {
                   style={[styles.sortBtn, sortBy === type && styles.sortBtnActive]}
                 >
                   <Text style={[styles.sortBtnText, sortBy === type && styles.sortBtnTextActive]}>
-                    {type === 'date' ? t('tab_history').toUpperCase() : type === 'pending' ? t('filter_pending').toUpperCase() : t('filter_completed').toUpperCase()}
+                    {type === 'date' ? 'DATE' : type === 'pending' ? 'PENDING' : 'COMPLETED'}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -231,109 +264,158 @@ export default function ClientDetailScreen({ route, navigation }: any) {
 
           {/* Orders List */}
           <Text style={[styles.sectionLabel, { marginLeft: 20 }]}>{t('customer_orders')} ({clientOrders.length})</Text>
-          {sortedOrders.map((order) => (
-            <View key={order.id} style={[styles.card, targetOrderId === order.id && styles.highlightedCard]}>
-              <View style={styles.orderHeader}>
-                <Text style={styles.orderItemName}>{order.item}</Text>
-                {targetOrderId === order.id && (
-                  <View style={styles.highlightBadge}>
-                    <Text style={styles.highlightBadgeText}>{t('requested')}</Text>
+          
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          ) : sortedOrders.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="document-outline" size={48} color={Colors.border} />
+              <Text style={styles.emptyText}>No orders yet</Text>
+            </View>
+          ) : (
+            sortedOrders.map((order: any) => {
+              const designName = getDesignName(order);
+              const price = getPrice(order);
+              const deliveryDate = getDeliveryDate(order);
+              const isPending = order.status === 'pending' || order.status === 'in-progress';
+
+              return (
+                <View key={order._id} style={[styles.card, targetOrderId === order._id && styles.highlightedCard]}>
+                  <View style={styles.orderHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={styles.orderItemName}>{designName}</Text>
+                      {targetOrderId === order._id && (
+                        <View style={styles.highlightBadge}>
+                          <Text style={styles.highlightBadgeText}>{t('requested')}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <TouchableOpacity onPress={() => openEditOrderModal(order)}>
+                      <Ionicons name="pencil" size={20} color={Colors.primary} />
+                    </TouchableOpacity>
                   </View>
-                )}
-              </View>
 
-              <View style={styles.infoRow}>
-                <Text style={styles.label}>Price</Text>
-                <Text style={[styles.value, { color: Colors.primary, fontWeight: '800' }]}>₹{order.price}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.label}>Status</Text>
-                <View style={[styles.statusBadge, { backgroundColor: order.status === 'Completed' ? Colors.success + '15' : 'rgba(163, 177, 138, 0.2)' }]}>
-                  <Text style={[styles.statusText, { color: order.status === 'Completed' ? Colors.success : Colors.primary }]}>{order.status === 'Completed' ? t('filter_completed') : t('filter_pending')}</Text>
-                </View>
-              </View>
-              {order.deliveryDate && (
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>{t('handover_date')}</Text>
-                  <Text style={styles.value}>{order.deliveryDate}</Text>
-                </View>
-              )}
-
-              {/* Share for this specific order */}
-              <View style={[styles.shareRow, { marginTop: 16 }]}>
-                <TouchableOpacity style={[styles.shareBtnMini, { backgroundColor: '#25D366' }]} onPress={() => handleShareWhatsApp(order)}>
-                  <Ionicons name="logo-whatsapp" size={16} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.shareBtnMini, { backgroundColor: '#6B705C' }]} onPress={() => handleSharePDF()}>
-                  <Ionicons name="document-text-outline" size={16} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-
-          {/* Measurements */}
-          {measurementEntries.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.measureHeader}>
-                <Text style={styles.sectionLabel}>{t('precision_measurements')}</Text>
-                {isEditing ? (
-                  <TouchableOpacity onPress={handleSaveMeasurements} style={styles.saveBtn}>
-                    <Text style={styles.saveBtnText}>{t('save')}</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editBtn}>
-                    <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
-                    <Text style={styles.editBtnText}>{t('edit')}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={styles.measureGrid}>
-                {measurementEntries.map(([key, val]) => (
-                  <View key={key} style={styles.measureItem}>
-                    <Text style={styles.measureLabel}>{key}</Text>
-                    {isEditing ? (
-                      <TextInput
-                        style={styles.measureInput}
-                        value={val as string}
-                        onChangeText={(text) => setMeasurements(prev => ({ ...prev, [key]: text }))}
-                        keyboardType="numeric"
-                        placeholder="0"
-                        placeholderTextColor={Colors.textLight}
-                      />
-                    ) : (
-                      <Text style={styles.measureValue}>{val as string || '—'}{val ? '"' : ''}</Text>
-                    )}
+                  <View style={styles.infoRow}>
+                    <Text style={styles.label}>Price</Text>
+                    <Text style={[styles.value, { color: Colors.primary, fontWeight: '800' }]}>₹{price}</Text>
                   </View>
-                ))}
-              </View>
-            </View>
-          )}
+                  <View style={styles.infoRow}>
+                    <Text style={styles.label}>Status</Text>
+                    <View style={[
+                      styles.statusBadge, 
+                      { backgroundColor: isPending ? 'rgba(220, 38, 38, 0.12)' : 'rgba(22, 163, 74, 0.12)' }
+                    ]}>
+                      <Text style={[
+                        styles.statusText, 
+                        { color: isPending ? '#DC2626' : '#16A34A' }
+                      ]}>
+                        {order.status}
+                      </Text>
+                    </View>
+                  </View>
+                  {deliveryDate && (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.label}>{t('handover_date')}</Text>
+                      <Text style={styles.value}>{deliveryDate}</Text>
+                    </View>
+                  )}
 
-          {/* Share actions */}
-          {!isEditing && (
-            <View style={styles.card}>
-              <Text style={styles.sectionLabel}>{t('share_pdf')}</Text>
-              <View style={styles.shareRow}>
-                <TouchableOpacity style={[styles.shareBtn, { backgroundColor: '#25D366' }]} onPress={() => handleShareWhatsApp(client)}>
-                  <Ionicons name="logo-whatsapp" size={20} color="#fff" /><Text style={styles.shareBtnText}>{t('whatsapp')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.shareBtn, { backgroundColor: '#EA4335' }]} onPress={handleGmail}>
-                  <Ionicons name="mail-outline" size={20} color="#fff" /><Text style={styles.shareBtnText}>{t('gmail')}</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.shareRow}>
-                <TouchableOpacity style={[styles.shareBtn, { backgroundColor: '#6B705C' }]} onPress={handleSharePDF}>
-                  <Ionicons name="document-text-outline" size={20} color="#fff" /><Text style={styles.shareBtnText}>{t('share_pdf')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.shareBtn, { backgroundColor: '#344E41' }]} onPress={handlePrint}>
-                  <Ionicons name="print-outline" size={20} color="#fff" /><Text style={styles.shareBtnText}>{t('print')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+                  {/* Measurements */}
+                  {order.measurements && order.measurements.length > 0 && (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={[styles.sectionLabel, { marginBottom: 8 }]}>{t('precision_measurements')}</Text>
+                      <View style={styles.measureGrid}>
+                        {order.measurements.map((m: any, idx: number) => (
+                          <View key={idx} style={styles.measureItem}>
+                            <Text style={styles.measureValue}>{m.value}"</Text>
+                            <Text style={styles.measureLabel}>{m.name}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Share for this specific order */}
+                  <View style={[styles.shareRow, { marginTop: 16 }]}>
+                    <TouchableOpacity style={[styles.shareBtnMini, { backgroundColor: '#25D366' }]} onPress={() => handleShareWhatsApp(order)}>
+                      <Ionicons name="logo-whatsapp" size={16} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.shareBtnMini, { backgroundColor: '#6B705C' }]} onPress={() => handleSharePDF(order)}>
+                      <Ionicons name="document-text-outline" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })
           )}
         </KeyboardAwareScrollView>
       </View>
+
+      {/* Edit Order Modal */}
+      <Modal visible={!!editingOrder} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={styles.modalTitle}>Edit Order</Text>
+              <TouchableOpacity onPress={() => setEditingOrder(null)}>
+                <Ionicons name="close" size={24} color={Colors.textDark} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Status</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              {['pending', 'in-progress', 'completed', 'delivered', 'cancelled'].map(st => (
+                <TouchableOpacity
+                  key={st}
+                  style={[
+                    styles.statusOptionBtn,
+                    editOrderStatus === st && styles.statusOptionBtnActive
+                  ]}
+                  onPress={() => setEditOrderStatus(st)}
+                >
+                  <Text style={[
+                    styles.statusOptionText,
+                    editOrderStatus === st && styles.statusOptionTextActive
+                  ]}>
+                    {st.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Amount / Price (₹)</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editOrderPrice}
+              onChangeText={setEditOrderPrice}
+              keyboardType="numeric"
+              placeholder="e.g. 1500"
+            />
+
+            <Text style={styles.inputLabel}>Handover Date</Text>
+            <TextInput
+              style={[styles.modalInput, { marginBottom: 24 }]}
+              value={editOrderDate}
+              onChangeText={setEditOrderDate}
+              placeholder="YYYY-MM-DD"
+            />
+
+            <TouchableOpacity 
+              style={styles.saveBtn} 
+              onPress={handleUpdateOrder}
+              disabled={isUpdatingOrder}
+            >
+              {isUpdatingOrder ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>SAVE CHANGES</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -373,41 +455,11 @@ const styles = StyleSheet.create({
   value: { fontSize: 16, fontWeight: '700', color: Colors.textDark },
   statusBadge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12 },
   statusText: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  measureHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  editBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(163, 177, 138, 0.1)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(163, 177, 138, 0.2)'
-  },
-  editBtnText: { color: Colors.primary, fontSize: 13, fontWeight: '800', textTransform: 'uppercase' },
-  saveBtn: {
-    backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 14,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8
-  },
-  saveBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
-  measureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  measureItem: {
-    width: '30%', backgroundColor: 'rgba(163, 177, 138, 0.05)', borderRadius: 16, padding: 14,
-    alignItems: 'center', borderWidth: 1, borderColor: Colors.border
-  },
-  measureLabel: { fontSize: 10, color: Colors.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontWeight: '700' },
-  measureValue: { fontSize: 18, fontWeight: '800', color: Colors.primary },
-  measureInput: {
-    fontSize: 18, fontWeight: '800', color: Colors.primary, textAlign: 'center',
-    borderBottomWidth: 2, borderBottomColor: Colors.primary, width: '100%', paddingVertical: 2
-  },
-  shareRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  shareBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 16, borderRadius: 16, gap: 10, elevation: 2
-  },
-  shareBtnText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   highlightedCard: { borderColor: Colors.primary, borderWidth: 2, backgroundColor: 'rgba(163, 177, 138, 0.05)' },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   orderItemName: { fontSize: 18, fontWeight: '800', color: Colors.textDark },
   highlightBadge: { backgroundColor: Colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   highlightBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  editInput: { borderBottomWidth: 1, borderBottomColor: Colors.border, marginBottom: 8, paddingVertical: 4, fontSize: 16, color: Colors.textDark, fontWeight: '600' },
   sortCard: { marginHorizontal: 20, marginBottom: 20 },
   sortLabel: { fontSize: 11, fontWeight: '800', color: Colors.textLight, marginBottom: 10, letterSpacing: 1 },
   sortRow: { flexDirection: 'row', gap: 10 },
@@ -415,5 +467,45 @@ const styles = StyleSheet.create({
   sortBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   sortBtnText: { fontSize: 10, fontWeight: '800', color: Colors.textLight },
   sortBtnTextActive: { color: '#fff' },
+  shareRow: { flexDirection: 'row', gap: 12 },
   shareBtnMini: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', elevation: 2 },
+  measureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  measureItem: {
+    width: '30%', backgroundColor: 'rgba(163, 177, 138, 0.05)', borderRadius: 16, padding: 14,
+    alignItems: 'center', borderWidth: 1, borderColor: Colors.border
+  },
+  measureLabel: { fontSize: 10, color: Colors.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontWeight: '700' },
+  measureValue: { fontSize: 18, fontWeight: '800', color: Colors.primary },
+  emptyContainer: { alignItems: 'center', marginTop: 60, gap: 16 },
+  emptyText: { color: Colors.textLight, fontSize: 16, fontWeight: '600' },
+  input: {
+    backgroundColor: Colors.surfaceAlt, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 14, color: Colors.textDark, fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end'
+  },
+  modalContent: {
+    backgroundColor: Colors.background, borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    padding: 24, paddingBottom: 40
+  },
+  modalTitle: { fontSize: 20, fontFamily: Typography.fashionBold, color: Colors.textDark },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: Colors.textLight, textTransform: 'uppercase', marginBottom: 8, marginTop: 12 },
+  modalInput: {
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 16, color: Colors.textDark, fontWeight: '600'
+  },
+  statusOptionBtn: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface
+  },
+  statusOptionBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  statusOptionText: { fontSize: 11, fontWeight: '800', color: Colors.textLight },
+  statusOptionTextActive: { color: '#FFF' },
+  saveBtn: {
+    backgroundColor: Colors.primary, borderRadius: 16, padding: 16, alignItems: 'center'
+  },
+  saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14, letterSpacing: 1 },
 });

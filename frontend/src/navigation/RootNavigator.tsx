@@ -16,7 +16,12 @@ import ClientDetailScreen from '../../app/screens/history/ClientDetailScreen';
 import ExistingCustScreen from '../../app/screens/home/ExistingCustScreen';
 import LanguageSelectionScreen from '../../app/language-selection';
 import AddDesignScreen from '../../app/screens/design/AddDesignScreen';
+import ViewDesignsScreen from '../../app/screens/design/ViewDesignsScreen';
+import HistoryOrdersScreen from '../../app/screens/history/HistoryOrdersScreen';
+import AddClientScreen from '../../app/screens/home/AddClientScreen';
 const Stack = createNativeStackNavigator();
+
+import API from '../../api/config';
 
 export default function RootNavigator() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -26,20 +31,9 @@ export default function RootNavigator() {
   useEffect(() => {
     checkInitialState();
     // Test API
-    fetch('http://10.145.237.210:5000/api/debug/test')
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          return res.json();
-        } else {
-          throw new Error("Oops, we haven't got JSON!");
-        }
-      })
-      .then(d => console.log('[DEBUG] App initialization test:', d))
-      .catch(e => console.error('[DEBUG] App initialization test failed:', e.message));
+    API.get('/debug/test')
+      .then(res => console.log('[DEBUG] App initialization test (Axios):', res.data))
+      .catch(e => console.error('[DEBUG] App initialization test failed (Axios):', e.message));
   }, []);
 
   const checkInitialState = async () => {
@@ -115,7 +109,9 @@ export default function RootNavigator() {
             <Stack.Screen name="ClientDetail" component={ClientDetailScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="ExistingCust" component={ExistingCustScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="AddDesign" component={AddDesignScreen} options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="MyDesigns" component={AddDesignScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="ViewDesigns" component={ViewDesignsScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="HistoryOrders" component={HistoryOrdersScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="AddClient" component={AddClientScreen} options={{ animation: 'slide_from_right' }} />
           </Stack.Group>
         )}
       </Stack.Navigator>

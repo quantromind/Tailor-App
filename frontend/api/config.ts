@@ -6,8 +6,16 @@ import { Platform } from 'react-native';
 // iOS simulator and web use localhost directly
 // For physical devices, use your computer's local IP address
 const getBaseUrl = () => {
+  // Production URL override injected via Expo build
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
   if (Platform.OS === 'android') {
-    return 'http://10.145.237.210:5000/api';
+    // 10.0.2.2 is the special alias to your host loopback interface (127.0.0.1 on your development machine)
+    // for Android Emulators. 
+    // For physical devices, use your computer's local IP address (currently 192.168.1.5)
+    return 'http://192.168.1.5:5000/api'; 
   }
   return 'http://localhost:5000/api';
 };
@@ -20,7 +28,7 @@ const API = axios.create({
 // Attach token to every request if available
 API.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('@auth_token');
-  console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+  console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   } else {

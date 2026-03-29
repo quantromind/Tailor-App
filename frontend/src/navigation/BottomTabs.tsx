@@ -6,10 +6,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
 import { useTranslation } from 'react-i18next';
 
-import HistoryScreen from '../../app/screens/history/HistoryScreen';
 import HomeScreen from '../../app/screens/home/HomeScreen';
-import ProfileScreen from '../../app/screens/profile/ProfileScreen';
 import SearchScreen from '../../app/screens/search/SearchScreen';
+import HistoryScreen from '../../app/screens/history/HistoryScreen';
+import HistoryOrdersScreen from '../../app/screens/history/HistoryOrdersScreen';
+import ProfileScreen from '../../app/screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -25,6 +26,7 @@ export default function BottomTabs({ onLogout }: { onLogout: () => void }) {
           let iconName = 'home';
           if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
           else if (route.name === 'Search') iconName = focused ? 'search' : 'search-outline';
+          else if (route.name === 'Customers') iconName = focused ? 'people' : 'people-outline';
           else if (route.name === 'History') iconName = focused ? 'time' : 'time-outline';
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName as any} size={size} color={color} />;
@@ -50,22 +52,27 @@ export default function BottomTabs({ onLogout }: { onLogout: () => void }) {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
-        component={HomeScreen} 
-        options={{ tabBarLabel: t('tab_home') }} 
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ tabBarLabel: t('tab_home') }}
       />
-      <Tab.Screen 
-        name="Search" 
-        component={SearchScreen} 
-        options={{ tabBarLabel: t('tab_search') }} 
+      <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{ tabBarLabel: t('tab_search') }}
       />
-      <Tab.Screen 
-        name="History" 
-        component={HistoryScreen} 
-        options={{ tabBarLabel: t('tab_history') }} 
+      <Tab.Screen
+        name="Customers"
+        component={HistoryScreen}
+        options={{ tabBarLabel: t('tab_customers') }}
       />
-      <Tab.Screen 
+      <Tab.Screen
+        name="History"
+        component={HistoryOrdersScreen}
+        options={{ tabBarLabel: t('tab_history') }}
+      />
+      <Tab.Screen
         name="Profile"
         options={{ tabBarLabel: t('tab_profile') }}
       >

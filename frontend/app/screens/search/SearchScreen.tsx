@@ -1,81 +1,63 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClientCard } from '../../../src/components/ClientCard';
 import { Colors, Typography } from '../../../src/constants/colors';
-
-const isToday = (dateStr: string) => {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-};
-
-const isYesterday = (dateStr: string) => {
-  const d = new Date(dateStr);
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return d.getFullYear() === yesterday.getFullYear() && d.getMonth() === yesterday.getMonth() && d.getDate() === yesterday.getDate();
-};
+import { searchOrders } from '../../../api';
 
 export default function SearchScreen({ navigation }: any) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  const [allOrders, setAllOrders] = useState<any[]>([]);
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [sortBy, setSortBy] = useState<'date' | 'name'>('date');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchOrders = async (q: string, sort: string) => {
+    setIsLoading(true);
+    try {
+      const data = await searchOrders(q, sort);
+      setOrders(data);
+    } catch (e) {
+      console.error('Failed to search orders:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
-      (async () => {
-        const data = await AsyncStorage.getItem('@orders');
-        if (data) setAllOrders(JSON.parse(data));
-        
-        const history = await AsyncStorage.getItem('@search_history');
-        if (history) setSearchHistory(JSON.parse(history));
-      })();
+      fetchOrders(query, sortBy);
     }, [])
   );
 
-  const saveSearchToHistory = async (searchTerm: string) => {
-    if (!searchTerm.trim()) return;
-    const newHistory = [searchTerm, ...searchHistory.filter(s => s !== searchTerm)].slice(0, 5);
-    setSearchHistory(newHistory);
-    await AsyncStorage.setItem('@search_history', JSON.stringify(newHistory));
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchOrders(query, sortBy);
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [query, sortBy]);
+
+  const getDesignName = (order: any) => order.design?.name || 'Unknown';
+  const getPrice = (order: any) => {
+    const priceMatch = order.notes?.match(/Price:\s?[₹$€]?\s?(\d+)/i);
+    return priceMatch ? parseInt(priceMatch[1]) : 0;
   };
-
-  const clearHistory = async () => {
-    setSearchHistory([]);
-    await AsyncStorage.removeItem('@search_history');
+  const getDeliveryDate = (order: any) => {
+    const dateMatch = order.notes?.match(/Delivery Date:\s?([^,]+)/i);
+    return dateMatch ? dateMatch[1].trim() : '';
   };
-
-  // Group by today / yesterday
-  const todayOrders = allOrders.filter(o => o.createdAt && isToday(o.createdAt));
-  const yesterdayOrders = allOrders.filter(o => o.createdAt && isYesterday(o.createdAt));
-
-  // Search filter
-  const searchResults = query.trim()
-    ? allOrders.filter(o => {
-      const name = (o.name || o.clientName || '').toLowerCase();
-      const phone = (o.phone || '').toLowerCase();
-      const q = query.toLowerCase();
-      return name.includes(q) || phone.includes(q);
-    })
-    : [];
 
   const handleSelectOrder = (item: any) => {
-    saveSearchToHistory(query || item.name || item.clientName);
-    navigation.navigate('ClientDetail', { client: item, targetOrderId: item.id });
+    navigation.navigate('ClientDetail', { 
+      client: item.customer, 
+      customerId: item.customer?._id,
+      targetOrderId: item._id 
+    });
   };
-
-  const isSearching = query.trim().length > 0;
-
-  const sections = [];
-  if (todayOrders.length > 0) sections.push({ title: t('today_orders'), data: todayOrders });
-  if (yesterdayOrders.length > 0) sections.push({ title: t('yesterday_orders'), data: yesterdayOrders });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -85,7 +67,10 @@ export default function SearchScreen({ navigation }: any) {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <Text style={styles.title}>{t('search_title')}</Text>
+        <Text style={styles.title}>Search Orders</Text>
+        {orders.length > 0 && (
+          <Text style={styles.subtitle}>{orders.length} order{orders.length !== 1 ? 's' : ''} found</Text>
+        )}
       </LinearGradient>
 
       <View style={styles.searchBar}>
@@ -102,71 +87,53 @@ export default function SearchScreen({ navigation }: any) {
         )}
       </View>
 
-      {isSearching ? (
+      {/* Sort chips */}
+      <View style={styles.sortRow}>
+        {(['date', 'name'] as const).map((f) => (
+          <TouchableOpacity
+            key={f}
+            style={[styles.sortChip, sortBy === f && styles.sortChipActive]}
+            onPress={() => setSortBy(f)}
+          >
+            <Ionicons 
+              name={f === 'date' ? 'calendar-outline' : 'text-outline'} 
+              size={14} 
+              color={sortBy === f ? '#FFF' : Colors.textLight} 
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[styles.sortText, sortBy === f && styles.sortTextActive]}>
+              {f === 'date' ? 'By Date' : 'By Name'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : (
         <FlatList
-          data={searchResults}
-          keyExtractor={(item, i) => item.id || i.toString()}
+          data={orders}
+          keyExtractor={(item, index) => item._id || item.id || `order-${index}`}
           contentContainerStyle={styles.listContainer}
           renderItem={({ item }) => (
             <ClientCard
-              name={item.name || item.clientName}
-              item={item.item}
-              price={item.price}
-              deliveryDate={item.deliveryDate}
+              name={item.customer?.name || 'Unknown'}
+              item={getDesignName(item)}
+              price={getPrice(item)}
+              deliveryDate={getDeliveryDate(item)}
+              status={item.status}
               onPress={() => handleSelectOrder(item)}
             />
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={48} color={Colors.border} />
-              <Text style={styles.emptyText}>{t('no_results')}</Text>
+              <Text style={styles.emptyText}>{query ? t('no_results') : 'Search for orders'}</Text>
             </View>
           }
         />
-      ) : (
-        <ScrollView contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false}>
-          {searchHistory.length > 0 && (
-            <View style={styles.historySection}>
-              <View style={styles.sectionHeaderHistory}>
-                <Text style={styles.sectionTitle}>{t('recent_searches')}</Text>
-                <Text style={styles.clearText} onPress={clearHistory}>{t('clear')}</Text>
-              </View>
-              <View style={styles.historyChips}>
-                {searchHistory.map((item, idx) => (
-                  <Text key={idx} style={styles.historyChip} onPress={() => setQuery(item)}>
-                    {item}
-                  </Text>
-                ))}
-              </View>
-            </View>
-          )}
-
-          <SectionList
-            sections={sections}
-            scrollEnabled={false}
-            keyExtractor={(item, i) => item.id || i.toString()}
-            renderSectionHeader={({ section: { title } }) => (
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{title}</Text>
-              </View>
-            )}
-            renderItem={({ item }) => (
-              <ClientCard
-                name={item.name || item.clientName}
-                item={item.item}
-                price={item.price}
-                deliveryDate={item.deliveryDate}
-                onPress={() => handleSelectOrder(item)}
-              />
-            )}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="calendar-outline" size={48} color={Colors.border} />
-                <Text style={styles.emptyText}>{t('no_activity')}</Text>
-              </View>
-            }
-          />
-        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -180,6 +147,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: 'rgba(52, 78, 65, 0.05)',
   },
   title: { fontSize: 26, fontFamily: Typography.fashionBold, color: Colors.textDark, letterSpacing: -0.5 },
+  subtitle: { fontSize: 12, color: Colors.textLight, fontWeight: '700', marginTop: 4 },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: Colors.surface, marginHorizontal: 20, marginTop: 16,
@@ -188,22 +156,17 @@ const styles = StyleSheet.create({
     shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10,
   },
   searchInput: { flex: 1, fontSize: 16, color: Colors.textDark, fontWeight: '600' },
+  sortRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, gap: 10 },
+  sortChip: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+  },
+  sortChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  sortText: { fontSize: 12, fontWeight: '800', color: Colors.textLight, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sortTextActive: { color: '#FFF' },
   listContainer: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
-  sectionHeader: {
-    paddingVertical: 10, paddingHorizontal: 4, marginTop: 12, marginBottom: 8,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  sectionTitle: { fontSize: 13, fontWeight: '800', color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1.5 },
-  historySection: { marginBottom: 20 },
-  sectionHeaderHistory: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  clearText: { fontSize: 12, color: Colors.error, fontWeight: '700' },
-  historyChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  historyChip: { 
-    backgroundColor: Colors.surface, paddingHorizontal: 12, paddingVertical: 6, 
-    borderRadius: 20, borderWidth: 1, borderColor: Colors.border, 
-    fontSize: 14, color: Colors.textDark, fontWeight: '600' 
-  },
   emptyContainer: { alignItems: 'center', marginTop: 80, gap: 16 },
   emptyText: { color: Colors.textDark, fontSize: 18, fontWeight: '700' },
-  emptySubText: { color: Colors.textLight, fontSize: 14, fontWeight: '500', textAlign: 'center' },
+  loadingContainer: { alignItems: 'center', marginTop: 80 },
 });

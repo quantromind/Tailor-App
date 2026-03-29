@@ -21,6 +21,10 @@ const designSchema = new mongoose.Schema({
     measurements: [{
         type: String
     }],
+    price: {
+        type: Number,
+        default: 0
+    },
     isCustom: {
         type: Boolean,
         default: false

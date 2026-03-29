@@ -5,13 +5,16 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
 import { createCustomer, createCustomDesign, createOrder } from '../../../api';
 export default function BillPreviewScreen({ route, navigation }: any) {
   const { t } = useTranslation();
   const { billData } = route.params;
+
+  const [price, setPrice] = React.useState(billData.price ? billData.price.toString() : '0');
+  const [deliveryDate, setDeliveryDate] = React.useState(billData.deliveryDate || '');
 
   const measurementsEntries = billData.measurements ? Object.entries(billData.measurements).filter(([_, v]) => v !== '') : [];
   const measurementsHtml = measurementsEntries.length > 0 
@@ -46,17 +49,18 @@ export default function BillPreviewScreen({ route, navigation }: any) {
     '</div>' +
     '<div class="section"><div class="st">' + t('order_info') + '</div>' +
     '<div class="row"><span class="l">' + t('category') + '</span><span class="v">' + billData.item + '</span></div>' +
-    '<div class="row"><span class="l">' + t('handover_date') + '</span><span class="v">' + billData.deliveryDate + '</span></div>' +
+    '<div class="row"><span class="l">' + t('handover_date') + '</span><span class="v">' + deliveryDate + '</span></div>' +
     '</div>' + measurementsHtml +
-    '<div class="total-row"><span class="total-label">' + t('grand_total') + '</span><span class="total-val">₹' + billData.price + '</span></div>' +
+    '<div class="total-row"><span class="total-label">' + t('grand_total') + '</span><span class="total-val">₹' + price + '</span></div>' +
     '</div></body></html>';
 
   const handleSave = async () => {
     try {
-      // 1. Save or get Customer
+      // 1. Save or get Customer (with gender)
       const customerRes = await createCustomer({ 
         name: billData.clientName, 
-        phone: billData.phone 
+        phone: billData.phone,
+        gender: billData.gender || 'male'
       });
 
       // 2. Save or get Design
@@ -76,12 +80,16 @@ export default function BillPreviewScreen({ route, navigation }: any) {
         customer: customerRes._id,
         design: designRes._id,
         measurements: formattedMeasurements,
-        notes: `Delivery Date: ${billData.deliveryDate}, Price: ₹${billData.price}`
+        price: Number(price) || 0,
+        deliveryDate: deliveryDate || null,
+        notes: ''
       });
 
       // 5. Also save locally for backward compatibility with UI
       const newOrder = { 
         ...billData, 
+        price: Number(price) || 0,
+        deliveryDate: deliveryDate || null,
         gender: billData.gender || (billData.type === 'Pant' || billData.type === 'Shirt' ? 'male' : 'female'),
         id: orderRes._id, 
         createdAt: new Date().toISOString(), 
@@ -100,13 +108,13 @@ export default function BillPreviewScreen({ route, navigation }: any) {
   };
 
   const handleShareWhatsApp = () => {
-    const msg = `*${t('receipt_header')}* %0A%0A${t('client_name_placeholder')}: ` + billData.clientName + `%0A${t('category')}: ` + billData.item + `%0A${t('grand_total')}: ₹` + billData.price + `%0A${t('handover_date')}: ` + billData.deliveryDate;
+    const msg = `*${t('receipt_header')}* %0A%0A${t('client_name_placeholder')}: ` + billData.clientName + `%0A${t('category')}: ` + billData.item + `%0A${t('grand_total')}: ₹` + price + `%0A${t('handover_date')}: ` + deliveryDate;
     Linking.openURL('whatsapp://send?text=' + msg).catch(() => Alert.alert('Error', 'WhatsApp not installed'));
   };
 
   const handleGmail = () => {
     const subject = encodeURIComponent(`${t('receipt_header')} – ` + billData.clientName);
-    const body = encodeURIComponent(`${t('client_name_placeholder')}: ` + billData.clientName + `\n${t('category')}: ` + billData.item + `\n${t('grand_total')}: ₹` + billData.price + `\n${t('handover_date')}: ` + billData.deliveryDate);
+    const body = encodeURIComponent(`${t('client_name_placeholder')}: ` + billData.clientName + `\n${t('category')}: ` + billData.item + `\n${t('grand_total')}: ₹` + price + `\n${t('handover_date')}: ` + deliveryDate);
     const gmailUrl = 'googlegmail:///co?subject=' + subject + '&body=' + body;
     Linking.openURL(gmailUrl).catch(() => {
       Linking.openURL('https://mail.google.com/mail/?view=cm&su=' + subject + '&body=' + body);
@@ -150,7 +158,16 @@ export default function BillPreviewScreen({ route, navigation }: any) {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('order_info')}</Text>
             <View style={styles.row}><Text style={styles.label}>{t('category')}</Text><Text style={styles.value}>{billData.item}</Text></View>
-            <View style={styles.row}><Text style={styles.label}>{t('handover_date')}</Text><Text style={styles.value}>{billData.deliveryDate}</Text></View>
+            <View style={[styles.row, { alignItems: 'center' }]}>
+              <Text style={styles.label}>{t('handover_date')}</Text>
+              <TextInput 
+                style={styles.inlineInput} 
+                value={deliveryDate} 
+                onChangeText={setDeliveryDate} 
+                placeholder="YYYY-MM-DD" 
+                placeholderTextColor={Colors.textLight} 
+              />
+            </View>
           </View>
 
           {billData.measurements && (
@@ -169,7 +186,17 @@ export default function BillPreviewScreen({ route, navigation }: any) {
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>{t('grand_total')}</Text>
-            <Text style={styles.totalValue}>₹{billData.price}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.totalValue}>₹</Text>
+              <TextInput
+                style={[styles.totalValue, { padding: 0, margin: 0, minWidth: 60, textAlign: 'right' }]}
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={Colors.primary}
+              />
+            </View>
           </View>
         </View>
 
@@ -253,4 +280,11 @@ const styles = StyleSheet.create({
   shareRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   shareBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14, gap: 8, elevation: 2 },
   shareBtnText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+  inlineInput: {
+    backgroundColor: Colors.surfaceAlt, 
+    borderWidth: 1, borderColor: Colors.border,
+    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
+    fontSize: 14, color: Colors.textDark, fontWeight: '700',
+    minWidth: 120, textAlign: 'right'
+  },
 });

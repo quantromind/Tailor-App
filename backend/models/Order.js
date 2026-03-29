@@ -25,12 +25,20 @@ const orderSchema = new mongoose.Schema({
     measurements: [measurementSchema],
     status: {
         type: String,
-        enum: ['pending', 'in-progress', 'completed', 'delivered'],
+        enum: ['pending', 'in-progress', 'completed', 'delivered', 'cancelled'],
         default: 'pending'
     },
     notes: {
         type: String,
         default: ''
+    },
+    price: {
+        type: Number,
+        default: 0
+    },
+    deliveryDate: {
+        type: Date,
+        default: null
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
@@ -44,3 +52,4 @@ const orderSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('Order', orderSchema);
+
