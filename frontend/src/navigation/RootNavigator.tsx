@@ -19,6 +19,7 @@ import AddDesignScreen from '../../app/screens/design/AddDesignScreen';
 import ViewDesignsScreen from '../../app/screens/design/ViewDesignsScreen';
 import HistoryOrdersScreen from '../../app/screens/history/HistoryOrdersScreen';
 import AddClientScreen from '../../app/screens/home/AddClientScreen';
+import SubscriptionScreen from '../../app/screens/subscription/SubscriptionScreen';
 const Stack = createNativeStackNavigator();
 
 import API from '../../api/config';
@@ -112,6 +113,7 @@ export default function RootNavigator() {
             <Stack.Screen name="ViewDesigns" component={ViewDesignsScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="HistoryOrders" component={HistoryOrdersScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="AddClient" component={AddClientScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ animation: 'slide_from_bottom' }} />
           </Stack.Group>
         )}
       </Stack.Navigator>

@@ -141,6 +141,25 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
           </TouchableOpacity>
         </View>
 
+        {/* Subscription Card */}
+        <TouchableOpacity 
+          style={styles.card} 
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Subscription')}
+        >
+          <Text style={styles.cardTitle}>Subscription</Text>
+          <View style={styles.infoRow}>
+            <View style={[styles.iconCircle, { backgroundColor: 'rgba(255, 215, 0, 0.15)', borderColor: 'rgba(255, 215, 0, 0.25)' }]}>
+              <Ionicons name="diamond-outline" size={18} color="#DAA520" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Current Plan</Text>
+              <Text style={styles.value}>View & Manage Plans</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+          </View>
+        </TouchableOpacity>
+
         {/* App Info */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>App Info</Text>

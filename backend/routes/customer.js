@@ -1,6 +1,7 @@
 const express = require('express');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
+const Subscription = require('../models/Subscription');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -16,6 +17,32 @@ router.post('/', auth, async (req, res) => {
             await customer.save();
             return res.json(customer);
         }
+
+        // Check subscription client limit before creating new customer
+        const subscription = await Subscription.findOne({
+            user: req.user.userId,
+            status: 'active',
+            endDate: { $gte: new Date() }
+        }).sort({ createdAt: -1 });
+
+        if (!subscription) {
+            return res.status(403).json({ 
+                message: 'No active subscription. Please subscribe to a plan to add clients.',
+                needsSubscription: true
+            });
+        }
+
+        if (subscription.clientLimit !== -1) {
+            const clientCount = await Customer.countDocuments({ createdBy: req.user.userId });
+            if (clientCount >= subscription.clientLimit) {
+                return res.status(403).json({
+                    message: `Client limit reached (${subscription.clientLimit}). Please upgrade your plan.`,
+                    needsUpgrade: true,
+                    currentPlan: subscription.plan
+                });
+            }
+        }
+
         customer = new Customer({ name, phone, gender: gender || null, createdBy: req.user.userId });
         await customer.save();
         res.status(201).json(customer);
