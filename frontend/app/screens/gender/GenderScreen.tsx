@@ -14,10 +14,9 @@ export default function GenderScreen({ route, navigation }: any) {
     if (gender === 'male') {
       navigation.navigate('MaleCategory', { client });
     } else if (gender === 'female') {
-      // Assuming FemaleCategory exists or will be added, for now showing Alert
-      Alert.alert('Info', t('coming_soon'));
+      navigation.navigate('FemaleCategory', { client });
     } else if (gender === 'kids') {
-      Alert.alert('Info', t('coming_soon'));
+      navigation.navigate('KidsCategory', { client });
     }
   };
 

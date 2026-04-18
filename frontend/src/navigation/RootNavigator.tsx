@@ -9,6 +9,8 @@ import RegisterScreen from '../../app/screens/auth/RegisterScreen';
 import BottomTabs from './BottomTabs';
 import GenderScreen from '../../app/screens/gender/GenderScreen';
 import MaleCategoryScreen from '../../app/screens/male/MaleCategoryScreen';
+import FemaleCategoryScreen from '../../app/screens/female/FemaleCategoryScreen';
+import KidsCategoryScreen from '../../app/screens/kids/KidsCategoryScreen';
 import PantMeasurementScreen from '../../app/screens/measurement/PantMeasurementScreen';
 import ShirtMeasurementScreen from '../../app/screens/measurement/ShirtMeasurementScreen';
 import BillPreviewScreen from '../../app/screens/billing/BillPreviewScreen';
@@ -103,6 +105,8 @@ export default function RootNavigator() {
             </Stack.Screen>
             <Stack.Screen name="Gender" component={GenderScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="MaleCategory" component={MaleCategoryScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="FemaleCategory" component={FemaleCategoryScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="KidsCategory" component={KidsCategoryScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="PantMeasurement" component={PantMeasurementScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="ShirtMeasurement" component={ShirtMeasurementScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="BillPreview" component={BillPreviewScreen} options={{ animation: 'slide_from_bottom' }} />

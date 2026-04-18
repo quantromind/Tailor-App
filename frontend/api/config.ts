@@ -6,16 +6,24 @@ import { Platform } from 'react-native';
 // iOS simulator and web use localhost directly
 // For physical devices, use your computer's local IP address
 const getBaseUrl = () => {
+  // Production URL (Render)
+  const productionUrl = 'https://tailor-app-y0lq.onrender.com/api';
+
   // Production URL override injected via Expo build
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
 
+  // Use production URL if it's a real build or if specified
+  if (__DEV__ === false) {
+    return productionUrl;
+  }
+
   if (Platform.OS === 'android') {
     // 10.0.2.2 is the special alias to your host loopback interface (127.0.0.1 on your development machine)
     // for Android Emulators. 
-    // For physical devices, use your computer's local IP address (currently 192.168.1.5)
-    return 'http://192.168.1.5:5000/api'; 
+    // For physical devices, use your computer's local IP address (currently 192.168.1.12)
+    return 'http://192.168.1.12:5000/api';
   }
   return 'http://localhost:5000/api';
 };

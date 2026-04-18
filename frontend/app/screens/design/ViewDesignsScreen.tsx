@@ -9,7 +9,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
-import { getUserDesigns } from '../../../api';
+import { getUserDesigns, deleteDesign } from '../../../api';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
@@ -103,6 +103,30 @@ export default function ViewDesignsScreen({ navigation }: any) {
     Linking.openURL(gmailUrl).catch(() => {
       Linking.openURL('https://mail.google.com/mail/?view=cm&su=' + subject + '&body=' + body);
     });
+  };
+
+  const handleDeleteDesign = async () => {
+    if (!selectedDesign || !selectedDesign.isCustom) return;
+    Alert.alert(
+      'Delete Design',
+      'Are you sure you want to delete this design?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDesign(selectedDesign._id);
+              setSelectedDesign(null);
+              loadDesigns();
+            } catch (e: any) {
+              Alert.alert('Error', e?.response?.data?.message || 'Failed to delete design');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSharePDF = async () => {
@@ -259,6 +283,16 @@ export default function ViewDesignsScreen({ navigation }: any) {
                     <Ionicons name="document-text-outline" size={18} color="#fff" />
                   </TouchableOpacity>
                 </View>
+
+                {selectedDesign?.isCustom && (
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={handleDeleteDesign}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#FFF" />
+                    <Text style={styles.deleteBtnText}>Delete Design</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </ScrollView>
           </View>
@@ -343,4 +377,10 @@ const styles = StyleSheet.create({
   shareRow: { flexDirection: 'row', gap: 10 },
   shareBtnModal: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 10, gap: 6 },
   shareBtnTextModal: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: '#DC2626', paddingVertical: 14, borderRadius: 14,
+    marginTop: 16,
+  },
+  deleteBtnText: { color: '#FFF', fontSize: 14, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
 });

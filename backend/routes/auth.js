@@ -2,10 +2,11 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Customer = require('../models/Customer');
 
 const router = express.Router();
 
-// Register API
+// Register API — new users get free tier (30 clients)
 router.post('/register', async (req, res) => {
     const { name, phone, password, companyName } = req.body;
 
@@ -21,21 +22,30 @@ router.post('/register', async (req, res) => {
             name,
             phone,
             companyName: companyName || '',
-            password: hashedPassword
+            password: hashedPassword,
+            clientLimit: 30,
+            subscriptionPlan: 'free'
         });
 
         await user.save();
 
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '365d' });
 
-        res.status(201).json({ token, userId: user._id, name: user.name, companyName: user.companyName });
+        res.status(201).json({ 
+            token, 
+            userId: user._id, 
+            name: user.name, 
+            companyName: user.companyName,
+            clientLimit: user.clientLimit,
+            subscriptionPlan: user.subscriptionPlan
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-// Login API
+// Login API — returns subscription info
 router.post('/login', async (req, res) => {
     const { phone, password } = req.body;
 
@@ -50,9 +60,20 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        // Count how many clients this user has
+        const clientCount = await Customer.countDocuments({ createdBy: user._id });
 
-        res.json({ token, userId: user._id, name: user.name, companyName: user.companyName });
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '365d' });
+
+        res.json({ 
+            token, 
+            userId: user._id, 
+            name: user.name, 
+            companyName: user.companyName,
+            clientLimit: user.clientLimit,
+            subscriptionPlan: user.subscriptionPlan,
+            clientCount
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
@@ -67,16 +88,17 @@ router.get('/profile', auth, async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-        res.json(user);
+        const clientCount = await Customer.countDocuments({ createdBy: user._id });
+        res.json({ ...user.toObject(), clientCount });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-// Update user profile
+// Update user profile (name, phone, company, logo)
 router.put('/profile', auth, async (req, res) => {
-    const { name, phone, companyName } = req.body;
+    const { name, phone, companyName, logo } = req.body;
 
     try {
         const user = await User.findById(req.user.userId);
@@ -86,8 +108,8 @@ router.put('/profile', auth, async (req, res) => {
 
         if (name) user.name = name;
         if (companyName !== undefined) user.companyName = companyName;
+        if (logo !== undefined) user.logo = logo;
         if (phone) {
-            // Check if another user has this phone number
             if (phone !== user.phone) {
                 const existingUser = await User.findOne({ phone });
                 if (existingUser) {
@@ -98,7 +120,17 @@ router.put('/profile', auth, async (req, res) => {
         }
 
         await user.save();
-        res.json({ userId: user._id, name: user.name, phone: user.phone, companyName: user.companyName });
+        const clientCount = await Customer.countDocuments({ createdBy: user._id });
+        res.json({ 
+            userId: user._id, 
+            name: user.name, 
+            phone: user.phone, 
+            companyName: user.companyName,
+            logo: user.logo,
+            clientLimit: user.clientLimit,
+            subscriptionPlan: user.subscriptionPlan,
+            clientCount
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
@@ -106,4 +138,3 @@ router.put('/profile', auth, async (req, res) => {
 });
 
 module.exports = router;
-

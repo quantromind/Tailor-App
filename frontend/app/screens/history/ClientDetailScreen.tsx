@@ -54,9 +54,17 @@ export default function ClientDetailScreen({ route, navigation }: any) {
     }
   };
 
-  const sortedOrders = [...clientOrders].sort((a: any, b: any) => {
-    if (sortBy === 'pending') return a.status === 'pending' ? -1 : 1;
-    if (sortBy === 'completed') return a.status === 'completed' ? -1 : 1;
+  const filteredOrders = clientOrders.filter(order => {
+    if (sortBy === 'pending') {
+      return order.status === 'pending' || order.status === 'in-progress';
+    }
+    if (sortBy === 'completed') {
+      return order.status === 'completed' || order.status === 'delivered';
+    }
+    return true;
+  });
+
+  const sortedOrders = [...filteredOrders].sort((a: any, b: any) => {
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
 
@@ -255,7 +263,7 @@ export default function ClientDetailScreen({ route, navigation }: any) {
                   style={[styles.sortBtn, sortBy === type && styles.sortBtnActive]}
                 >
                   <Text style={[styles.sortBtnText, sortBy === type && styles.sortBtnTextActive]}>
-                    {type === 'date' ? 'DATE' : type === 'pending' ? 'PENDING' : 'COMPLETED'}
+                    {type === 'date' ? t('all_orders') : type === 'pending' ? t('filter_pending') : t('filter_completed')}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -263,7 +271,7 @@ export default function ClientDetailScreen({ route, navigation }: any) {
           </View>
 
           {/* Orders List */}
-          <Text style={[styles.sectionLabel, { marginLeft: 20 }]}>{t('customer_orders')} ({clientOrders.length})</Text>
+          <Text style={[styles.sectionLabel, { marginLeft: 20 }]}>{t('customer_orders')} ({sortedOrders.length})</Text>
           
           {isLoading ? (
             <View style={styles.loadingContainer}>
@@ -272,7 +280,9 @@ export default function ClientDetailScreen({ route, navigation }: any) {
           ) : sortedOrders.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="document-outline" size={48} color={Colors.border} />
-              <Text style={styles.emptyText}>No orders yet</Text>
+              <Text style={styles.emptyText}>
+                {clientOrders.length === 0 ? t('no_orders') : t('no_results')}
+              </Text>
             </View>
           ) : (
             sortedOrders.map((order: any) => {

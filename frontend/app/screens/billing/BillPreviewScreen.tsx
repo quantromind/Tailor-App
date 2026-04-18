@@ -9,12 +9,34 @@ import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpaci
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
 import { createCustomer, createCustomDesign, createOrder } from '../../../api';
+
 export default function BillPreviewScreen({ route, navigation }: any) {
   const { t } = useTranslation();
   const { billData } = route.params;
 
   const [price, setPrice] = React.useState(billData.price ? billData.price.toString() : '0');
+  const [advancePayment, setAdvancePayment] = React.useState('0');
   const [deliveryDate, setDeliveryDate] = React.useState(billData.deliveryDate || '');
+  const [tailorProfile, setTailorProfile] = React.useState<any>(null);
+
+  // Generate bill date/time
+  const now = new Date();
+  const billDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const billTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  // Calculate due amount
+  const totalPrice = Number(price) || 0;
+  const advance = Number(advancePayment) || 0;
+  const dueAmount = Math.max(0, totalPrice - advance);
+
+  // Load tailor profile for logo
+  React.useEffect(() => {
+    AsyncStorage.getItem('@tailor_profile').then(data => {
+      if (data) setTailorProfile(JSON.parse(data));
+    });
+  }, []);
+
+  const shopName = tailorProfile?.companyName || 'eTailoring';
 
   const measurementsEntries = billData.measurements ? Object.entries(billData.measurements).filter(([_, v]) => v !== '') : [];
   const measurementsHtml = measurementsEntries.length > 0 
@@ -27,22 +49,27 @@ export default function BillPreviewScreen({ route, navigation }: any) {
     'body { font-family: "Helvetica"; padding: 40px; background-color: #F8F9F5; color: #344E41; }' +
     '.container { max-width: 600px; margin: auto; border: 1px solid #EDF1E4; border-radius: 20px; padding: 30px; background-color: #FFFFFF; box-shadow: 0 4px 20px rgba(52, 78, 65, 0.05); }' +
     'h1 { text-align: center; color: #344E41; margin-bottom: 4px; font-weight: 800; letter-spacing: 2px; }' +
-    '.sub { text-align: center; color: #6B705C; margin-bottom: 30px; text-transform: uppercase; font-size: 11px; letter-spacing: 3px; font-weight: 700; }' +
+    '.sub { text-align: center; color: #6B705C; margin-bottom: 20px; text-transform: uppercase; font-size: 11px; letter-spacing: 3px; font-weight: 700; }' +
+    '.bill-meta { text-align: center; color: #6B705C; font-size: 12px; margin-bottom: 20px; }' +
     '.section { border-bottom: 1px solid #EDF1E4; padding: 15px 0; }' +
     '.st { font-weight: 800; color: #344E41; margin-bottom: 10px; text-transform: uppercase; font-size: 11px; letter-spacing: 1.5px; }' +
     '.row { display: flex; justify-content: space-between; padding: 8px 0; }' +
     '.l { color: #6B705C; font-size: 14px; }' +
     '.v { font-weight: 700; color: #344E41; font-size: 14px; }' +
-    '.total-row { display: flex; justify-content: space-between; margin-top: 25px; padding-top: 20px; border-top: 2px dashed #A3B18A; }' +
-    '.total-label { font-size: 20px; font-weight: 800; }' +
-    '.total-val { font-size: 26px; font-weight: 900; color: #344E41; }' +
+    '.total-row { display: flex; justify-content: space-between; margin-top: 15px; padding-top: 15px; border-top: 2px dashed #A3B18A; }' +
+    '.total-label { font-size: 18px; font-weight: 800; }' +
+    '.total-val { font-size: 24px; font-weight: 900; color: #344E41; }' +
+    '.payment-row { display: flex; justify-content: space-between; padding: 6px 0; }' +
+    '.advance { color: #16A34A; font-weight: 700; }' +
+    '.due { color: #DC2626; font-weight: 800; font-size: 18px; }' +
     '.meas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }' +
     '.meas-item { background: #F8F9F5; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #EDF1E4; }' +
     '.meas-val { font-weight: 800; font-size: 14px; display: block; color: #344E41; }' +
     '.meas-lab { font-size: 9px; color: #6B705C; text-transform: uppercase; margin-top: 2px; font-weight: 700; }' +
     '</style></head><body>' +
     '<div class="container">' +
-    '<h1>' + t('receipt_header') + '</h1><div class="sub">' + t('receipt_sub') + '</div>' +
+    '<h1>' + shopName + '</h1><div class="sub">' + t('receipt_sub') + '</div>' +
+    '<div class="bill-meta">' + t('bill_date') + ': ' + billDate + ' | ' + t('bill_time') + ': ' + billTime + '</div>' +
     '<div class="section"><div class="st">' + t('client_info') + '</div>' +
     '<div class="row"><span class="l">' + t('full_name_label').replace(' *', '') + '</span><span class="v">' + billData.clientName + '</span></div>' +
     '<div class="row"><span class="l">' + t('phone_placeholder') + '</span><span class="v">' + billData.phone + '</span></div>' +
@@ -52,43 +79,42 @@ export default function BillPreviewScreen({ route, navigation }: any) {
     '<div class="row"><span class="l">' + t('handover_date') + '</span><span class="v">' + deliveryDate + '</span></div>' +
     '</div>' + measurementsHtml +
     '<div class="total-row"><span class="total-label">' + t('grand_total') + '</span><span class="total-val">₹' + price + '</span></div>' +
+    (advance > 0 ? '<div class="payment-row"><span class="l">' + t('advance_payment') + '</span><span class="advance">₹' + advance + '</span></div>' : '') +
+    (advance > 0 ? '<div class="payment-row"><span class="l" style="font-weight:800">' + t('due_amount') + '</span><span class="due">₹' + dueAmount + '</span></div>' : '') +
     '</div></body></html>';
 
   const handleSave = async () => {
     try {
-      // 1. Save or get Customer (with gender)
       const customerRes = await createCustomer({ 
         name: billData.clientName, 
         phone: billData.phone,
         gender: billData.gender || 'male'
       });
 
-      // 2. Save or get Design
       const category = billData.gender === 'male' ? 'mens' : (billData.gender === 'female' ? 'womens' : 'kids');
       const designRes = await createCustomDesign({ 
         name: billData.item, 
         category 
       });
 
-      // 3. Format measurements
       const formattedMeasurements = Object.entries(billData.measurements || {})
         .filter(([_, v]) => v !== '')
         .map(([k, v]: any) => ({ name: k, value: v.toString() }));
 
-      // 4. Create Order in Backend
       const orderRes = await createOrder({
         customer: customerRes._id,
         design: designRes._id,
         measurements: formattedMeasurements,
-        price: Number(price) || 0,
+        price: totalPrice,
+        advancePayment: advance,
         deliveryDate: deliveryDate || null,
         notes: ''
       });
 
-      // 5. Also save locally for backward compatibility with UI
       const newOrder = { 
         ...billData, 
-        price: Number(price) || 0,
+        price: totalPrice,
+        advancePayment: advance,
         deliveryDate: deliveryDate || null,
         gender: billData.gender || (billData.type === 'Pant' || billData.type === 'Shirt' ? 'male' : 'female'),
         id: orderRes._id, 
@@ -103,18 +129,23 @@ export default function BillPreviewScreen({ route, navigation }: any) {
       Alert.alert(t('success'), t('save_success'), [{ text: 'OK', onPress: () => navigation.navigate('MainTabs') }]);
     } catch (e: any) { 
       console.error(e);
-      Alert.alert('Error', e.response?.data?.message || t('save_error')); 
+      // Handle client limit error
+      if (e.response?.data?.code === 'CLIENT_LIMIT_REACHED') {
+        Alert.alert(t('client_limit_reached'), e.response.data.message);
+      } else {
+        Alert.alert('Error', e.response?.data?.message || t('save_error')); 
+      }
     }
   };
 
   const handleShareWhatsApp = () => {
-    const msg = `*${t('receipt_header')}* %0A%0A${t('client_name_placeholder')}: ` + billData.clientName + `%0A${t('category')}: ` + billData.item + `%0A${t('grand_total')}: ₹` + price + `%0A${t('handover_date')}: ` + deliveryDate;
+    const msg = `*${shopName}*%0A${t('bill_date')}: ${billDate}%0A%0A${t('client_name_placeholder')}: ` + billData.clientName + `%0A${t('category')}: ` + billData.item + `%0A${t('grand_total')}: ₹` + price + (advance > 0 ? `%0A${t('advance_payment')}: ₹${advance}%0A${t('due_amount')}: ₹${dueAmount}` : '') + `%0A${t('handover_date')}: ` + deliveryDate;
     Linking.openURL('whatsapp://send?text=' + msg).catch(() => Alert.alert('Error', 'WhatsApp not installed'));
   };
 
   const handleGmail = () => {
-    const subject = encodeURIComponent(`${t('receipt_header')} – ` + billData.clientName);
-    const body = encodeURIComponent(`${t('client_name_placeholder')}: ` + billData.clientName + `\n${t('category')}: ` + billData.item + `\n${t('grand_total')}: ₹` + price + `\n${t('handover_date')}: ` + deliveryDate);
+    const subject = encodeURIComponent(`${shopName} – Bill – ` + billData.clientName);
+    const body = encodeURIComponent(`${t('client_name_placeholder')}: ` + billData.clientName + `\n${t('category')}: ` + billData.item + `\n${t('grand_total')}: ₹` + price + (advance > 0 ? `\n${t('advance_payment')}: ₹${advance}\n${t('due_amount')}: ₹${dueAmount}` : '') + `\n${t('handover_date')}: ` + deliveryDate);
     const gmailUrl = 'googlegmail:///co?subject=' + subject + '&body=' + body;
     Linking.openURL(gmailUrl).catch(() => {
       Linking.openURL('https://mail.google.com/mail/?view=cm&su=' + subject + '&body=' + body);
@@ -140,14 +171,26 @@ export default function BillPreviewScreen({ route, navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back-outline" size={24} color={Colors.textDark} />
         </TouchableOpacity>
-        <Text style={styles.title}>Atelier Design</Text>
+        <Text style={styles.title}>{t('bill_preview_title')}</Text>
         <View style={{ width: 32 }} />
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.billCard}>
-          <Text style={styles.shopTitle}>{t('receipt_header')}</Text>
+          <Text style={styles.shopTitle}>{shopName}</Text>
           <Text style={styles.shopSub}>{t('receipt_sub')}</Text>
+
+          {/* Bill Date & Time */}
+          <View style={styles.dateTimeRow}>
+            <View style={styles.dateTimeItem}>
+              <Ionicons name="calendar-outline" size={14} color={Colors.textLight} />
+              <Text style={styles.dateTimeText}>{billDate}</Text>
+            </View>
+            <View style={styles.dateTimeItem}>
+              <Ionicons name="time-outline" size={14} color={Colors.textLight} />
+              <Text style={styles.dateTimeText}>{billTime}</Text>
+            </View>
+          </View>
           
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('client_info')}</Text>
@@ -184,6 +227,7 @@ export default function BillPreviewScreen({ route, navigation }: any) {
             </View>
           )}
 
+          {/* Total Amount */}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>{t('grand_total')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -198,6 +242,30 @@ export default function BillPreviewScreen({ route, navigation }: any) {
               />
             </View>
           </View>
+
+          {/* Advance Payment */}
+          <View style={styles.paymentRow}>
+            <Text style={styles.paymentLabel}>{t('advance_payment')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.advanceText}>₹</Text>
+              <TextInput
+                style={[styles.advanceText, { padding: 0, margin: 0, minWidth: 50, textAlign: 'right' }]}
+                value={advancePayment}
+                onChangeText={setAdvancePayment}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor="#16A34A"
+              />
+            </View>
+          </View>
+
+          {/* Due Amount */}
+          {advance > 0 && (
+            <View style={styles.paymentRow}>
+              <Text style={[styles.paymentLabel, { fontWeight: '800' }]}>{t('due_amount')}</Text>
+              <Text style={styles.dueText}>₹{dueAmount}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.footerActions}>
@@ -252,7 +320,13 @@ const styles = StyleSheet.create({
     shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10,
   },
   shopTitle: { fontSize: 24, fontFamily: Typography.fashionBold, color: Colors.textDark, textAlign: 'center', marginBottom: 4 },
-  shopSub: { fontSize: 11, color: Colors.textLight, textAlign: 'center', marginBottom: 24, textTransform: 'uppercase', letterSpacing: 2, fontWeight: '700' },
+  shopSub: { fontSize: 11, color: Colors.textLight, textAlign: 'center', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 2, fontWeight: '700' },
+  dateTimeRow: { 
+    flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 20,
+    paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(52, 78, 65, 0.05)'
+  },
+  dateTimeItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dateTimeText: { fontSize: 12, color: Colors.textLight, fontWeight: '700' },
   section: { 
     marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(52, 78, 65, 0.03)' 
   },
@@ -268,11 +342,18 @@ const styles = StyleSheet.create({
   measValue: { fontSize: 15, fontWeight: '800', color: Colors.textDark, textAlign: 'center' },
   measLabel: { fontSize: 10, color: Colors.textLight, textAlign: 'center', marginTop: 2, textTransform: 'uppercase', fontWeight: '700' },
   totalRow: { 
-    flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, 
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, 
     paddingTop: 16, borderTopWidth: 2, borderTopColor: Colors.primary, borderStyle: 'dotted' 
   },
   totalLabel: { fontSize: 18, fontWeight: '800', color: Colors.textDark },
   totalValue: { fontSize: 22, fontWeight: '900', color: Colors.primary },
+  paymentRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 8,
+  },
+  paymentLabel: { fontSize: 14, color: Colors.textLight, fontWeight: '600' },
+  advanceText: { fontSize: 16, fontWeight: '700', color: '#16A34A' },
+  dueText: { fontSize: 18, fontWeight: '900', color: '#DC2626' },
   footerActions: { gap: 16 },
   actionBtn: { borderRadius: 16, overflow: 'hidden', elevation: 4 },
   actionGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 10 },

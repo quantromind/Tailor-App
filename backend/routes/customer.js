@@ -1,6 +1,7 @@
 const express = require('express');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
+const User = require('../models/User');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -16,6 +17,21 @@ router.post('/', auth, async (req, res) => {
             await customer.save();
             return res.json(customer);
         }
+
+        // Check client limit before creating new customer
+        const user = await User.findById(req.user.userId);
+        const currentCount = await Customer.countDocuments({ createdBy: req.user.userId });
+        const limit = user?.clientLimit || 30;
+        
+        if (currentCount >= limit) {
+            return res.status(403).json({ 
+                message: `Client limit reached (${limit}). Upgrade your subscription to add more clients.`,
+                code: 'CLIENT_LIMIT_REACHED',
+                currentCount,
+                limit
+            });
+        }
+
         customer = new Customer({ name, phone, gender: gender || null, createdBy: req.user.userId });
         await customer.save();
         res.status(201).json(customer);

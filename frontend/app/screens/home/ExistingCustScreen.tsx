@@ -61,8 +61,10 @@ export default function ExistingCustScreen({ route, navigation }: any) {
     const gender = item.gender;
     if (gender === 'male') {
       navigation.navigate('MaleCategory', { client: item });
-    } else if (gender === 'female' || gender === 'kids') {
-      Alert.alert('Coming Soon', t('coming_soon') || 'This section is under development');
+    } else if (gender === 'female') {
+      navigation.navigate('FemaleCategory', { client: item });
+    } else if (gender === 'kids') {
+      navigation.navigate('KidsCategory', { client: item });
     } else {
       Alert.alert('Info', 'Client gender not set. Please update the client profile first.');
     }

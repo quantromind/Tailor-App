@@ -36,9 +36,17 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }:
     try {
       const response = await registerUser({ name, phone, password, companyName });
 
-      // Store token and profile
+      // Store token and profile (new users get free plan)
       await AsyncStorage.setItem('@auth_token', response.token);
-      const profileData = { name, phone, companyName, userId: response.userId };
+      const profileData = { 
+        name, 
+        phone, 
+        companyName, 
+        userId: response.userId,
+        clientLimit: response.clientLimit || 30,
+        subscriptionPlan: response.subscriptionPlan || 'free',
+        clientCount: 0
+      };
       await AsyncStorage.setItem('@tailor_profile', JSON.stringify(profileData));
 
       Alert.alert(t('success'), t('registration_success'), [

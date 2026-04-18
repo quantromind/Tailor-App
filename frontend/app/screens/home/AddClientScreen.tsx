@@ -40,9 +40,9 @@ export default function AddClientScreen({ navigation }: any) {
       if (gender === 'male') {
         navigation.navigate('MaleCategory', { client: customer });
       } else if (gender === 'female') {
-        Alert.alert('Coming Soon', t('coming_soon'));
-      } else {
-        Alert.alert('Coming Soon', t('coming_soon'));
+        navigation.navigate('FemaleCategory', { client: customer });
+      } else if (gender === 'kids') {
+        navigation.navigate('KidsCategory', { client: customer });
       }
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to save client');

@@ -36,6 +36,10 @@ const orderSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    advancePayment: {
+        type: Number,
+        default: 0
+    },
     deliveryDate: {
         type: Date,
         default: null
@@ -52,4 +56,3 @@ const orderSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('Order', orderSchema);
-

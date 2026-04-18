@@ -1,18 +1,21 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../src/constants/colors';
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { useEffect, useState, useCallback } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Image } from "react-native";
+import LottieView from "lottie-react-native";
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from "react-i18next";
 import { getRecentOrders } from '../../../api';
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: '#FF6B6B',
-  'in-progress': '#FF9800',
-  completed: '#4CAF50',
-  delivered: '#2196F3',
-  cancelled: '#9E9E9E',
+    pending: '#FF6B6B',
+    'in-progress': '#FF9800',
+    completed: '#4CAF50',
+    delivered: '#2196F3',
+    cancelled: '#9E9E9E',
 };
 
 export default function HomeScreen() {
@@ -20,37 +23,63 @@ export default function HomeScreen() {
     const navigation = useNavigation<any>();
     const [recentOrders, setRecentOrders] = useState<any[]>([]);
     const [loadingOrders, setLoadingOrders] = useState(true);
+    const [userName, setUserName] = useState('');
 
     useEffect(() => {
-        const load = async () => {
-            try {
-                const data = await getRecentOrders();
-                setRecentOrders(data.slice(0, 5));
-            } catch (e) {
-                console.error('Failed to load recent orders:', e);
-            } finally {
-                setLoadingOrders(false);
-            }
-        };
-        load();
+        loadUserName();
     }, []);
 
+    useFocusEffect(
+        useCallback(() => {
+            loadRecentOrders();
+        }, [])
+    );
+
+    const loadUserName = async () => {
+        try {
+            const profileData = await AsyncStorage.getItem('@tailor_profile');
+            if (profileData) {
+                const profile = JSON.parse(profileData);
+                setUserName(profile.name || '');
+            }
+        } catch (e) {
+            console.error('Failed to load profile:', e);
+        }
+    };
+
+    const loadRecentOrders = async () => {
+        try {
+            setLoadingOrders(true);
+            const data = await getRecentOrders();
+            // Backend already filters out completed/delivered
+            setRecentOrders(data.slice(0, 5));
+        } catch (e) {
+            console.error('Failed to load recent orders:', e);
+        } finally {
+            setLoadingOrders(false);
+        }
+    };
+
     return (
-        <LinearGradient
-            colors={["#FFF9E6", "#FFD76A"]}
+        <View
             style={styles.container}
         >
             <ScrollView showsVerticalScrollIndicator={false}>
 
-                {/* Header */}
+                {/* Header Section */}
                 <View style={styles.header}>
-                    <MaterialCommunityIcons name="needle" size={34} color="#8B4513" />
-                    <Text style={styles.appName}>eTailoring</Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.appName}>eTailoring</Text>
+                        <Text style={styles.welcome}>{t('welcome_user', { name: userName || 'Tailor' })}</Text>
+                        <Text style={styles.subtitle}>{t('subtitle_home')}</Text>
+                    </View>
+                    <LottieView
+                        source={require('../../../assets/animations/Sewing tools.json')}
+                        autoPlay
+                        loop
+                        style={styles.headerAnimation}
+                    />
                 </View>
-
-                {/* Welcome */}
-                <Text style={styles.welcome}>{t('welcome_user')}</Text>
-                <Text style={styles.subtitle}>{t('subtitle_home')}</Text>
 
                 {/* Search Client Button */}
                 <TouchableOpacity
@@ -96,14 +125,14 @@ export default function HomeScreen() {
                     >
                         <Ionicons name="color-palette-outline" size={28} color="#FFF" />
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.designsTitle}>My Designs</Text>
-                            <Text style={styles.designsSub}>View all your custom designs</Text>
+                            <Text style={styles.designsTitle}>{t('my_designs')}</Text>
+                            <Text style={styles.designsSub}>{t('view_designs_sub')}</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={22} color="#FFF" />
                     </LinearGradient>
                 </TouchableOpacity>
 
-                {/* Recent Orders */}
+                {/* Recent Orders (excludes completed/delivered) */}
                 <View style={styles.recentHeader}>
                     <Text style={styles.sectionTitle}>{t('recent_orders')}</Text>
                     <TouchableOpacity onPress={() => navigation.navigate('History')}>
@@ -141,27 +170,33 @@ export default function HomeScreen() {
                     })
                 )}
 
+                {/* Powered by Quantromind */}
+                <View style={styles.poweredBy}>
+                    <Text style={styles.poweredByText}>{t('powered_by')}</Text>
+                </View>
+
             </ScrollView>
-        </LinearGradient>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, paddingTop: 60, paddingHorizontal: 20 },
-    header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
-    appName: { fontSize: 28, fontWeight: '900', color: '#422006' },
-    welcome: { fontSize: 16, fontWeight: '600', color: '#5C3D11', marginBottom: 4 },
-    subtitle: { fontSize: 13, color: '#8B6914', marginBottom: 20 },
+    container: { flex: 1, paddingTop: -20, paddingHorizontal: 20, backgroundColor: Colors.background },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: -40 },
+    appName: { fontSize: 28, fontWeight: '900', color: Colors.textDark, marginBottom: 4 },
+    headerAnimation: { width: 200, height: 200, marginRight: -20 },
+    welcome: { fontSize: 16, fontWeight: '600', color: Colors.textDark, marginBottom: 4 },
+    subtitle: { fontSize: 13, color: Colors.textLight },
     searchButton: {
         flexDirection: 'row', alignItems: 'center', gap: 12,
-        backgroundColor: '#FFFEF5', padding: 16, borderRadius: 16,
+        backgroundColor: Colors.surface, padding: 16, borderRadius: 16,
         borderWidth: 1, borderColor: 'rgba(52, 78, 65, 0.15)',
         marginBottom: 20, shadowColor: Colors.primary,
         shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
     },
     searchButtonText: { flex: 1, fontSize: 16, fontWeight: '700', color: Colors.primary },
     card: {
-        backgroundColor: '#FFFEF5', borderRadius: 20, padding: 20,
+        backgroundColor: Colors.surface, borderRadius: 20, padding: 20,
         marginBottom: 16, borderWidth: 1, borderColor: 'rgba(52, 78, 65, 0.1)',
         shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
     },
@@ -177,10 +212,10 @@ const styles = StyleSheet.create({
     designsTitle: { fontSize: 18, fontWeight: '800', color: '#FFF' },
     designsSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
     recentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-    sectionTitle: { fontSize: 18, fontWeight: '800', color: '#422006' },
+    sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.textDark },
     viewAll: { fontSize: 13, fontWeight: '700', color: Colors.primary },
     recentOrderCard: {
-        backgroundColor: '#FFFEF5', borderRadius: 16, padding: 14,
+        backgroundColor: Colors.surface, borderRadius: 16, padding: 14,
         marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         borderWidth: 1, borderColor: 'rgba(52, 78, 65, 0.08)', elevation: 1,
     },
@@ -194,4 +229,6 @@ const styles = StyleSheet.create({
     statusText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
     emptyOrders: { alignItems: 'center', paddingVertical: 30, gap: 10 },
     emptyOrdersText: { color: '#9CA3AF', fontSize: 14, fontWeight: '600' },
+    poweredBy: { alignItems: 'center', paddingVertical: 20, marginTop: 10 },
+    poweredByText: { fontSize: 11, color: '#9CA3AF', fontWeight: '600', letterSpacing: 1 },
 });

@@ -22,7 +22,6 @@ export default function ShirtMeasurementScreen({ route, navigation }: any) {
     length: clientData?.measurements?.length || '',
     chest: clientData?.measurements?.chest || '',
     stomach: clientData?.measurements?.stomach || '',
-    hip: clientData?.measurements?.hip || '',
     shoulder: clientData?.measurements?.shoulder || '',
     sleeve: clientData?.measurements?.sleeve || '',
     cuffLength: clientData?.measurements?.cuffLength || '',

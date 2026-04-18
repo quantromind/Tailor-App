@@ -6,6 +6,7 @@ export const createOrder = async (data: {
   measurements: { name: string; value: string }[];
   notes?: string;
   price?: number;
+  advancePayment?: number;
   deliveryDate?: string;
 }) => {
   const response = await API.post('/orders', data);

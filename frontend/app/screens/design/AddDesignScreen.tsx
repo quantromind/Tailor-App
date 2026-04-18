@@ -39,19 +39,36 @@ export default function AddDesignScreen({ navigation }: any) {
     setMeasurements(measurements.filter(m => m !== item));
   };
 
+  const [tempImage, setTempImage] = useState('');
+
   const handlePickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 0.1,
       base64: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
-      setImage(`data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`);
+      const base64Str = asset.base64 || '';
+      // Check size — base64 adds ~33% overhead, limit to ~5MB raw
+      if (base64Str.length > 7_000_000) {
+        Alert.alert('Image Too Large', 'Please select a smaller image or take a new photo with lower resolution.');
+        return;
+      }
+      setTempImage(`data:${asset.mimeType || 'image/jpeg'};base64,${base64Str}`);
     }
+  };
+
+  const handleConfirmImage = () => {
+    setImage(tempImage);
+    setTempImage('');
+  };
+
+  const handleCancelImage = () => {
+    setTempImage('');
   };
 
   const handleSaveDesign = async () => {
@@ -61,10 +78,11 @@ export default function AddDesignScreen({ navigation }: any) {
     }
     setLoading(true);
     try {
+      console.log('[AddDesign] Saving design:', { name, category, hasImage: !!image, measurements });
       await createCustomDesign({ 
         name, 
         category,
-        image, 
+        image: image || undefined, 
         description, 
         measurements,
         price: price ? Number(price) : 0 
@@ -73,7 +91,7 @@ export default function AddDesignScreen({ navigation }: any) {
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (e: any) {
-      console.error(e);
+      console.error('[AddDesign] Save error:', e?.response?.data || e.message);
       Alert.alert('Error', e.response?.data?.message || 'Failed to save design');
     } finally {
       setLoading(false);
@@ -143,21 +161,42 @@ export default function AddDesignScreen({ navigation }: any) {
             ))}
           </View>
 
-          <TouchableOpacity onPress={handlePickImage} style={styles.imagePickerBtn} activeOpacity={0.8}>
-            {image ? (
-              <View style={styles.imagePreviewContainer}>
-                <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
-                <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImage('')}>
-                  <Ionicons name="close-circle" size={28} color="#FF6347" />
+          {/* Image Preview with Done/Cancel or Pick */}
+          {tempImage ? (
+            <View>
+              <View style={styles.imagePickerBtn}>
+                <View style={styles.imagePreviewContainer}>
+                  <Image source={{ uri: tempImage }} style={styles.previewImage} resizeMode="cover" />
+                </View>
+              </View>
+              <View style={styles.imageActionRow}>
+                <TouchableOpacity style={styles.imageCancelBtn} onPress={handleCancelImage}>
+                  <Ionicons name="close" size={18} color="#DC2626" />
+                  <Text style={styles.imageCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.imageDoneBtn} onPress={handleConfirmImage}>
+                  <Ionicons name="checkmark" size={18} color="#FFF" />
+                  <Text style={styles.imageDoneText}>Done</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <Ionicons name="image-outline" size={36} color={Colors.primary} />
-                <Text style={styles.imagePlaceholderText}>Upload Image (Optional)</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={handlePickImage} style={styles.imagePickerBtn} activeOpacity={0.8}>
+              {image ? (
+                <View style={styles.imagePreviewContainer}>
+                  <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
+                  <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImage('')}>
+                    <Ionicons name="close-circle" size={28} color="#FF6347" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image-outline" size={36} color={Colors.primary} />
+                  <Text style={styles.imagePlaceholderText}>Upload Image (Optional)</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -264,4 +303,17 @@ const styles = StyleSheet.create({
   imagePreviewContainer: { flex: 1, position: 'relative' },
   previewImage: { width: '100%', height: '100%' },
   removeImageBtn: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FFF', borderRadius: 14, padding: 2 },
+  imageActionRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  imageCancelBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, borderRadius: 14, gap: 6,
+    backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA',
+  },
+  imageCancelText: { fontSize: 14, fontWeight: '800', color: '#DC2626' },
+  imageDoneBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, borderRadius: 14, gap: 6,
+    backgroundColor: Colors.primary, elevation: 2,
+  },
+  imageDoneText: { fontSize: 14, fontWeight: '800', color: '#FFF' },
 });

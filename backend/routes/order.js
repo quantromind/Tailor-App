@@ -8,7 +8,7 @@ const router = express.Router();
 
 // Create a new order
 router.post('/', auth, async (req, res) => {
-    const { customer, design, measurements, notes, price, deliveryDate } = req.body;
+    const { customer, design, measurements, notes, price, deliveryDate, advancePayment } = req.body;
     try {
         const order = new Order({
             customer,
@@ -16,6 +16,7 @@ router.post('/', auth, async (req, res) => {
             measurements: measurements || [],
             notes: notes || '',
             price: price || 0,
+            advancePayment: advancePayment || 0,
             deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
             createdBy: req.user.userId
         });
@@ -31,7 +32,10 @@ router.post('/', auth, async (req, res) => {
 // Get recent orders (last 10) — for Home screen widget
 router.get('/recent', auth, async (req, res) => {
     try {
-        const orders = await Order.find({ createdBy: req.user.userId })
+        const orders = await Order.find({ 
+            createdBy: req.user.userId,
+            status: { $nin: ['completed', 'delivered'] }
+        })
             .populate('customer')
             .populate('design')
             .sort({ createdAt: -1 })
@@ -233,7 +237,7 @@ router.patch('/:id/status', auth, async (req, res) => {
 
 // Update order (measurements, notes, price)
 router.put('/:id', auth, async (req, res) => {
-    const { measurements, notes, price, deliveryDate, status } = req.body;
+    const { measurements, notes, price, deliveryDate, status, advancePayment } = req.body;
     try {
         const order = await Order.findOne({ _id: req.params.id, createdBy: req.user.userId })
             .populate('customer').populate('design');
@@ -241,6 +245,7 @@ router.put('/:id', auth, async (req, res) => {
         if (measurements) order.measurements = measurements;
         if (notes !== undefined) order.notes = notes;
         if (price !== undefined) order.price = price;
+        if (advancePayment !== undefined) order.advancePayment = advancePayment;
         if (deliveryDate !== undefined) order.deliveryDate = deliveryDate ? new Date(deliveryDate) : null;
         if (status) order.status = status;
         await order.save();
