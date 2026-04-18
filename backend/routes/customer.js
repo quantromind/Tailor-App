@@ -1,7 +1,7 @@
 const express = require('express');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
-const User = require('../models/User');
+const Subscription = require('../models/Subscription');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -18,20 +18,30 @@ router.post('/', auth, async (req, res) => {
             return res.json(customer);
         }
 
-        // Check client limit before creating new customer
-        const user = await User.findById(req.user.userId);
-        const currentCount = await Customer.countDocuments({ createdBy: req.user.userId });
-        const limit = user?.clientLimit || 30;
-        
-        if (currentCount >= limit) {
+        // Check subscription client limit before creating new customer
+        const subscription = await Subscription.findOne({
+            user: req.user.userId,
+            status: 'active',
+            endDate: { $gte: new Date() }
+        }).sort({ createdAt: -1 });
+
+        if (!subscription) {
             return res.status(403).json({ 
-                message: `Client limit reached (${limit}). Upgrade your subscription to add more clients.`,
-                code: 'CLIENT_LIMIT_REACHED',
-                currentCount,
-                limit
+                message: 'No active subscription. Please subscribe to a plan to add clients.',
+                needsSubscription: true
             });
         }
 
+        if (subscription.clientLimit !== -1) {
+            const clientCount = await Customer.countDocuments({ createdBy: req.user.userId });
+            if (clientCount >= subscription.clientLimit) {
+                return res.status(403).json({
+                    message: `Client limit reached (${subscription.clientLimit}). Please upgrade your plan.`,
+                    needsUpgrade: true,
+                    currentPlan: subscription.plan
+                });
+            }
+        }
         customer = new Customer({ name, phone, gender: gender || null, createdBy: req.user.userId });
         await customer.save();
         res.status(201).json(customer);
