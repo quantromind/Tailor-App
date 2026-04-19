@@ -10,6 +10,7 @@ import { Alert, Image, Linking, ScrollView, StyleSheet, Text, TextInput, Touchab
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
 import { createCustomer, createCustomDesign, createOrder } from '../../../api';
+import { SERVER_URL } from '../../../api/config';
 
 export default function BillPreviewScreen({ route, navigation }: any) {
   const { t } = useTranslation();
@@ -42,15 +43,33 @@ export default function BillPreviewScreen({ route, navigation }: any) {
     });
   }, []);
 
-  // Convert local file URIs to base64 for HTML embedding
+  // Convert local file URIs or remote URLs to base64 for HTML embedding
   const uriToBase64 = async (uri: string): Promise<string | null> => {
     try {
+      if (!uri) return null;
       if (uri.startsWith('data:')) return uri; // already base64
-      if (uri.startsWith('http')) return uri;   // remote URL, use directly
+      
+      // If it's a relative path from the server (e.g., /uploads/...), make it absolute
+      let absoluteUri = uri;
+      if (uri.startsWith('/') && !uri.startsWith('//')) {
+        absoluteUri = `${SERVER_URL}${uri}`;
+      } else if (!uri.startsWith('http') && !uri.startsWith('file:') && !uri.startsWith('content:')) {
+        // Fallback for relative paths without leading slash
+        absoluteUri = `${SERVER_URL}/${uri}`;
+      }
+
+      console.log(`[BillPreview] Converting URI to base64: ${absoluteUri.substring(0, 100)}${absoluteUri.length > 100 ? '...' : ''}`);
+
+      if (absoluteUri.startsWith('http')) {
+        // For remote URLs, we'll try to use them directly in the HTML first.
+        // expo-print usually handles remote images fine if they are publicly accessible.
+        return absoluteUri;
+      }
+
       // Local file URI — read as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      const base64 = await FileSystem.readAsStringAsync(absoluteUri, { encoding: 'base64' });
       // Detect extension for mime type
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpeg';
+      const ext = absoluteUri.split('.').pop()?.split('?')[0].toLowerCase() || 'jpeg';
       const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
       return `data:${mime};base64,${base64.trim()}`;
     } catch (e) {

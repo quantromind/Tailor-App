@@ -14,23 +14,26 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/tailorbook_logo.png",
+        "backgroundImage": "./assets/images/tailorbook_logo.png",
+        "monochromeImage": "./assets/images/tailorbook_logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.sakshi_quantro.eTailoringApp"
+      "package": "com.sakshi_quantro.eTailoringApp",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/tailorbook_logo.png"
     },
     "plugins": [
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/tailorbook_logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -56,6 +59,7 @@
       "eas": {
         "projectId": "9343e3b0-1c5b-494d-9488-911ebad1fb70"
       }
-    }
+    },
+    "owner": "sakshi_quantro"
   }
 }

@@ -2,7 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SplashScreen from 'expo-splash-screen';
 import { initI18n } from '../i18n'; // Import initialization function
+import CustomSplashScreen from '../../components/CustomSplashScreen';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading the app might cause this to error */
+});
 
 import LoginScreen from '../../app/screens/auth/LoginScreen';
 import RegisterScreen from '../../app/screens/auth/RegisterScreen';
@@ -30,6 +37,7 @@ export default function RootNavigator() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [hasSelectedLanguage, setHasSelectedLanguage] = useState<boolean | null>(null);
   const [isI18nInitialized, setIsI18nInitialized] = useState(false);
+  const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
 
   useEffect(() => {
     checkInitialState();
@@ -66,7 +74,9 @@ export default function RootNavigator() {
     setHasSelectedLanguage(true);
   };
 
-  if (isLoggedIn === null || hasSelectedLanguage === null || !isI18nInitialized) return null; // loading
+  if (isLoggedIn === null || hasSelectedLanguage === null || !isI18nInitialized || showAnimatedSplash) {
+    return <CustomSplashScreen onAnimationFinish={() => setShowAnimatedSplash(false)} />;
+  }
 
   return (
     <NavigationContainer>

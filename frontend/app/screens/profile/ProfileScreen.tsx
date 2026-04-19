@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
 import { useTranslation } from 'react-i18next';
 import { API } from '../../../api';
+import { SERVER_URL } from '../../../api/config';
 
 export default function ProfileScreen({ navigation, onLogout }: any) {
   const { t, i18n } = useTranslation();
@@ -113,7 +115,20 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
         companyName: editCompany.trim(),
       };
       if (editPhone) payload.phone = editPhone;
-      if (editLogo) payload.logo = editLogo;
+      
+      // If logo is a local file URI, convert to base64 before saving
+      let logoToSave = editLogo;
+      if (logoToSave && logoToSave.startsWith('file:')) {
+        try {
+          const base64 = await FileSystem.readAsStringAsync(logoToSave, { encoding: 'base64' });
+          const ext = logoToSave.split('.').pop()?.toLowerCase() || 'jpeg';
+          const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
+          logoToSave = `data:${mime};base64,${base64}`;
+        } catch (fileErr) {
+          console.error('Error converting local logo to base64:', fileErr);
+        }
+      }
+      if (logoToSave) payload.logo = logoToSave;
 
       const response = await API.put('/auth/profile', payload);
       const data = response.data;
@@ -122,13 +137,13 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
         name: data.name,
         phone: data.phone,
         companyName: data.companyName,
-        logo: data.logo || editLogo || '',
+        logo: data.logo || logoToSave || '',
         userId: data.userId,
         clientLimit: data.clientLimit,
         subscriptionPlan: data.subscriptionPlan,
       }));
 
-      setProfile((prev: any) => ({ ...prev, ...data, logo: data.logo || editLogo }));
+      setProfile((prev: any) => ({ ...prev, ...data, logo: data.logo || logoToSave }));
       setEditModal(false);
       Alert.alert('Saved!', 'Your profile has been updated successfully.');
     } catch (e: any) {
@@ -185,8 +200,23 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
     );
   };
 
-  const logoUri: string | null = profile?.logo || null;
-  const initials = profile?.name?.charAt(0)?.toUpperCase() || '?';
+  const getLogoUri = (logo: string | null | undefined): string | null => {
+    if (!logo) return null;
+    // If it's a full URL, base64 data, or a local file path, use it as is
+    if (logo.startsWith('http') || logo.startsWith('data:') || logo.startsWith('file:')) {
+      return logo;
+    }
+    
+    // Handle relative paths from server
+    let processedLogo = logo;
+    if (!processedLogo.startsWith('/')) {
+      processedLogo = '/' + processedLogo;
+    }
+    return `${SERVER_URL}${processedLogo}`;
+  };
+
+  const logoUri = getLogoUri(profile?.logo);
+  const initials = profile?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 3) || '?';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -207,7 +237,15 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={openEditModal} activeOpacity={0.85}>
             {logoUri ? (
-              <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="cover" />
+              <Image 
+                key={logoUri} // Force re-render on URI change
+                source={{ uri: logoUri }} 
+                style={styles.logoImage} 
+                resizeMode="cover"
+                onError={(e) => {
+                  console.error('[ProfileScreen] Logo failed to load:', e.nativeEvent.error);
+                }}
+              />
             ) : (
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{initials}</Text>
@@ -268,14 +306,25 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
           activeOpacity={0.8}
           onPress={() => navigation.navigate('Subscription')}
         >
-          <Text style={styles.cardTitle}>Subscription</Text>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.cardTitle}>Subscription</Text>
+            {profile?.subscriptionPlan && (
+              <View style={[styles.planBadge, { backgroundColor: profile.subscriptionPlan === 'free' ? 'rgba(107, 112, 92, 0.1)' : 'rgba(218, 165, 32, 0.1)' }]}>
+                <Text style={[styles.planBadgeText, { color: profile.subscriptionPlan === 'free' ? '#6B705C' : '#DAA520' }]}>
+                  {profile.subscriptionPlan.toUpperCase().replace('_', ' ')}
+                </Text>
+              </View>
+            )}
+          </View>
           <View style={styles.infoRow}>
             <View style={[styles.iconCircle, { backgroundColor: 'rgba(255, 215, 0, 0.15)', borderColor: 'rgba(255, 215, 0, 0.25)' }]}>
               <Ionicons name="diamond-outline" size={18} color="#DAA520" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Current Plan</Text>
-              <Text style={styles.value}>View & Manage Plans</Text>
+              <Text style={styles.label}>Current Status</Text>
+              <Text style={styles.value}>
+                {profile?.subscriptionPlan === 'free' ? 'Free Tier' : 'Active Subscription'}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
           </View>
@@ -350,7 +399,7 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
               <Text style={styles.fieldLabel}>Company Logo</Text>
               <TouchableOpacity onPress={pickLogo} style={styles.logoPickerBtn} activeOpacity={0.8}>
                 {editLogo ? (
-                  <Image source={{ uri: editLogo }} style={styles.logoPreview} resizeMode="cover" />
+                  <Image source={{ uri: getLogoUri(editLogo) || editLogo }} style={styles.logoPreview} resizeMode="cover" />
                 ) : (
                   <View style={styles.logoPickerPlaceholder}>
                     <Ionicons name="storefront-outline" size={36} color={Colors.textLight} />
@@ -480,6 +529,8 @@ const styles = StyleSheet.create({
   },
   cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   cardTitle: { fontSize: 13, fontWeight: '800', color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1.5 },
+  planBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  planBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surfaceAlt },
   editBtnText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
   infoRow: {

@@ -11,6 +11,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
 import { getOrdersByCustomer, updateCustomer, updateOrder } from '../../../api';
+import { SERVER_URL } from '../../../api/config';
 
 export default function ClientDetailScreen({ route, navigation }: any) {
   const { t } = useTranslation();
@@ -134,13 +135,23 @@ export default function ClientDetailScreen({ route, navigation }: any) {
     }
   };
 
-  // Helper: convert local file URI to base64 data URI for HTML rendering
+  // Helper: convert local file URI or server path to base64 data URI for HTML rendering
   const uriToBase64 = async (uri: string): Promise<string | null> => {
     try {
       if (!uri) return null;
-      if (uri.startsWith('data:') || uri.startsWith('http')) return uri;
-      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpeg';
+      if (uri.startsWith('data:')) return uri;
+      
+      let absoluteUri = uri;
+      if (uri.startsWith('/') && !uri.startsWith('//')) {
+        absoluteUri = `${SERVER_URL}${uri}`;
+      } else if (!uri.startsWith('http') && !uri.startsWith('file:') && !uri.startsWith('content:')) {
+        absoluteUri = `${SERVER_URL}/${uri}`;
+      }
+
+      if (absoluteUri.startsWith('http')) return absoluteUri;
+
+      const base64 = await FileSystem.readAsStringAsync(absoluteUri, { encoding: 'base64' });
+      const ext = absoluteUri.split('.').pop()?.split('?')[0].toLowerCase() || 'jpeg';
       const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
       return `data:${mime};base64,${base64}`;
     } catch { return null; }
@@ -149,8 +160,29 @@ export default function ClientDetailScreen({ route, navigation }: any) {
   const handleShareWhatsApp = (order: any) => {
     const designName = getDesignName(order);
     const price = getPrice(order);
+    const date = getDeliveryDate(order);
     const hasImage = !!(order.image);
-    const msg = `*${t('receipt_header')} DETAIL*%0A%0A${t('full_name_label').replace(' *', '')}: ${editedName}%0A${t('category')}: ${designName}%0A${t('grand_total')}: ₹${price}%0AStatus: ${order.status}${hasImage ? '%0A📎 Design image attached in PDF' : ''}`;
+    
+    // Construct a rich description
+    let msg = `*${tailorProfile?.companyName || 'TailorBook'} - ORDER DETAILS*%0A`;
+    msg += `--------------------------%0A`;
+    msg += `*Client:* ${editedName}%0A`;
+    msg += `*Item:* ${designName}%0A`;
+    msg += `*Price:* ₹${price}%0A`;
+    msg += `*Status:* ${order.status.toUpperCase()}%0A`;
+    if (date) msg += `*Delivery:* ${date}%0A`;
+    
+    if (order.measurements && order.measurements.length > 0) {
+      msg += `%0A*Measurements:*%0A`;
+      order.measurements.forEach((m: any) => {
+        msg += `• ${m.name}: ${m.value}"%0A`;
+      });
+    }
+
+    if (hasImage) {
+      msg += `%0A📎 _Design image included in the shared PDF report._`;
+    }
+
     Linking.openURL(`whatsapp://send?text=${msg}`).catch(() => Alert.alert('Error', t('save_error')));
   };
 

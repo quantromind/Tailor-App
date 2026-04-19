@@ -74,7 +74,7 @@ export default function HomeScreen() {
                         <Text style={styles.subtitle}>{t('subtitle_home')}</Text>
                     </View>
                     <LottieView
-                        source={require('../../../assets/animations/Sewing tools.json')}
+                        source={require('../../../assets/animations/sewing_tools.json')}
                         autoPlay
                         loop
                         style={styles.headerAnimation}

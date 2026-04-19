@@ -28,8 +28,11 @@ const getBaseUrl = () => {
   return 'http://localhost:5000/api';
 };
 
+const BASE_URL = getBaseUrl();
+export const SERVER_URL = BASE_URL.replace('/api', '');
+
 const API = axios.create({
-  baseURL: getBaseUrl(),
+  baseURL: BASE_URL,
   timeout: 10000,
 });
 
