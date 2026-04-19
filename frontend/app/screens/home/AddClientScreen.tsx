@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Colors, Typography } from '../../../src/constants/colors';
@@ -45,7 +45,45 @@ export default function AddClientScreen({ navigation }: any) {
         navigation.navigate('KidsCategory', { client: customer });
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save client');
+      // Log full error details for developers
+      console.log('--- CLIENT SAVE ERROR ---');
+      console.log('API Endpoint: POST /customers');
+      if (e.response) {
+        console.log('Status Code:', e.response.status);
+        console.log('Response Data:', JSON.stringify(e.response.data, null, 2));
+      } else {
+        console.error('Error:', e.message);
+      }
+      console.log('-------------------------');
+
+      const data = e.response?.data;
+      
+      if (data?.code === 'NO_SUBSCRIPTION' || data?.code === 'CLIENT_LIMIT_REACHED') {
+        const isLimit = data.code === 'CLIENT_LIMIT_REACHED';
+        const title = isLimit ? 'Plan Limit Reached' : 'Subscription Required';
+        const message = isLimit 
+          ? "You have reached the client limit for your current plan. Please upgrade to continue adding more clients."
+          : "An active subscription is required to add new clients and manage your business. Choose a plan that fits your needs.";
+
+        Alert.alert(
+          title,
+          message,
+          [
+            { text: 'Later', style: 'cancel' },
+            { 
+              text: 'View Plans', 
+              onPress: () => navigation.navigate('Subscription'),
+              style: 'default'
+            }
+          ]
+        );
+      } else {
+        // Generic clean message for other errors
+        Alert.alert(
+          'Could Not Save Client',
+          'Something went wrong while saving the client. Please check your connection and try again.'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -125,8 +163,14 @@ export default function AddClientScreen({ navigation }: any) {
             style={styles.saveGradient}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="arrow-forward-circle-outline" size={24} color="#FFF" />
-            <Text style={styles.saveBtnText}>{loading ? 'Saving...' : 'Save & Continue'}</Text>
+            {loading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <>
+                <Ionicons name="arrow-forward-circle-outline" size={24} color="#FFF" />
+                <Text style={styles.saveBtnText}>Save & Continue</Text>
+              </>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </View>

@@ -69,7 +69,7 @@ export default function HomeScreen() {
                 {/* Header Section */}
                 <View style={styles.header}>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.appName}>eTailoring</Text>
+                        <Text style={styles.appName}>TailorBook</Text>
                         <Text style={styles.welcome}>{t('welcome_user', { name: userName || 'Tailor' })}</Text>
                         <Text style={styles.subtitle}>{t('subtitle_home')}</Text>
                     </View>
@@ -172,6 +172,11 @@ export default function HomeScreen() {
 
                 {/* Powered by Quantromind */}
                 <View style={styles.poweredBy}>
+                    <Image
+                        source={require('../../../assets/images/logo.png')}
+                        style={styles.qmLogo}
+                        resizeMode="contain"
+                    />
                     <Text style={styles.poweredByText}>{t('powered_by')}</Text>
                 </View>
 
@@ -231,4 +236,5 @@ const styles = StyleSheet.create({
     emptyOrdersText: { color: '#9CA3AF', fontSize: 14, fontWeight: '600' },
     poweredBy: { alignItems: 'center', paddingVertical: 20, marginTop: 10 },
     poweredByText: { fontSize: 11, color: '#9CA3AF', fontWeight: '600', letterSpacing: 1 },
+    qmLogo: { width: 36, height: 36, marginBottom: 4 },
 });

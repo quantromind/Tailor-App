@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
 import { createCustomer, createCustomDesign, createOrder } from '../../../api';
@@ -18,6 +19,11 @@ export default function BillPreviewScreen({ route, navigation }: any) {
   const [advancePayment, setAdvancePayment] = React.useState('0');
   const [deliveryDate, setDeliveryDate] = React.useState(billData.deliveryDate || '');
   const [tailorProfile, setTailorProfile] = React.useState<any>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
+  // base64 versions of images for HTML embedding
+  const [logoBase64, setLogoBase64] = React.useState<string | null>(null);
+  const [designImageBase64, setDesignImageBase64] = React.useState<string | null>(null);
+  const [isImagesReady, setIsImagesReady] = React.useState(false);
 
   // Generate bill date/time
   const now = new Date();
@@ -36,7 +42,42 @@ export default function BillPreviewScreen({ route, navigation }: any) {
     });
   }, []);
 
-  const shopName = tailorProfile?.companyName || 'eTailoring';
+  // Convert local file URIs to base64 for HTML embedding
+  const uriToBase64 = async (uri: string): Promise<string | null> => {
+    try {
+      if (uri.startsWith('data:')) return uri; // already base64
+      if (uri.startsWith('http')) return uri;   // remote URL, use directly
+      // Local file URI — read as base64
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      // Detect extension for mime type
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpeg';
+      const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
+      return `data:${mime};base64,${base64.trim()}`;
+    } catch (e) {
+      console.error('[BillPreview] Failed to convert image to base64:', e);
+      return null;
+    }
+  };
+
+  React.useEffect(() => {
+    const convertAll = async () => {
+      const logoUri = tailorProfile?.logo || null;
+      const designUri = billData.designImage || null;
+
+      const [lB64, dB64] = await Promise.all([
+        logoUri ? uriToBase64(logoUri) : Promise.resolve(null),
+        designUri ? uriToBase64(designUri) : Promise.resolve(null)
+      ]);
+
+      setLogoBase64(lB64);
+      setDesignImageBase64(dB64);
+      setIsImagesReady(true);
+    };
+    convertAll();
+  }, [tailorProfile, billData.designImage]);
+
+  const shopName = tailorProfile?.companyName || 'TailorBook';
+  const designImageUri: string | null = billData.designImage || null;
 
   const measurementsEntries = billData.measurements ? Object.entries(billData.measurements).filter(([_, v]) => v !== '') : [];
   const measurementsHtml = measurementsEntries.length > 0 
@@ -45,45 +86,98 @@ export default function BillPreviewScreen({ route, navigation }: any) {
       '</div></div>'
     : '';
 
-  const receiptHtml = '<html><head><style>' +
-    'body { font-family: "Helvetica"; padding: 40px; background-color: #F8F9F5; color: #344E41; }' +
-    '.container { max-width: 600px; margin: auto; border: 1px solid #EDF1E4; border-radius: 20px; padding: 30px; background-color: #FFFFFF; box-shadow: 0 4px 20px rgba(52, 78, 65, 0.05); }' +
-    'h1 { text-align: center; color: #344E41; margin-bottom: 4px; font-weight: 800; letter-spacing: 2px; }' +
-    '.sub { text-align: center; color: #6B705C; margin-bottom: 20px; text-transform: uppercase; font-size: 11px; letter-spacing: 3px; font-weight: 700; }' +
-    '.bill-meta { text-align: center; color: #6B705C; font-size: 12px; margin-bottom: 20px; }' +
-    '.section { border-bottom: 1px solid #EDF1E4; padding: 15px 0; }' +
-    '.st { font-weight: 800; color: #344E41; margin-bottom: 10px; text-transform: uppercase; font-size: 11px; letter-spacing: 1.5px; }' +
-    '.row { display: flex; justify-content: space-between; padding: 8px 0; }' +
-    '.l { color: #6B705C; font-size: 14px; }' +
-    '.v { font-weight: 700; color: #344E41; font-size: 14px; }' +
-    '.total-row { display: flex; justify-content: space-between; margin-top: 15px; padding-top: 15px; border-top: 2px dashed #A3B18A; }' +
-    '.total-label { font-size: 18px; font-weight: 800; }' +
-    '.total-val { font-size: 24px; font-weight: 900; color: #344E41; }' +
-    '.payment-row { display: flex; justify-content: space-between; padding: 6px 0; }' +
-    '.advance { color: #16A34A; font-weight: 700; }' +
-    '.due { color: #DC2626; font-weight: 800; font-size: 18px; }' +
-    '.meas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }' +
-    '.meas-item { background: #F8F9F5; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #EDF1E4; }' +
-    '.meas-val { font-weight: 800; font-size: 14px; display: block; color: #344E41; }' +
-    '.meas-lab { font-size: 9px; color: #6B705C; text-transform: uppercase; margin-top: 2px; font-weight: 700; }' +
-    '</style></head><body>' +
-    '<div class="container">' +
-    '<h1>' + shopName + '</h1><div class="sub">' + t('receipt_sub') + '</div>' +
-    '<div class="bill-meta">' + t('bill_date') + ': ' + billDate + ' | ' + t('bill_time') + ': ' + billTime + '</div>' +
-    '<div class="section"><div class="st">' + t('client_info') + '</div>' +
-    '<div class="row"><span class="l">' + t('full_name_label').replace(' *', '') + '</span><span class="v">' + billData.clientName + '</span></div>' +
-    '<div class="row"><span class="l">' + t('phone_placeholder') + '</span><span class="v">' + billData.phone + '</span></div>' +
-    '</div>' +
-    '<div class="section"><div class="st">' + t('order_info') + '</div>' +
-    '<div class="row"><span class="l">' + t('category') + '</span><span class="v">' + billData.item + '</span></div>' +
-    '<div class="row"><span class="l">' + t('handover_date') + '</span><span class="v">' + deliveryDate + '</span></div>' +
-    '</div>' + measurementsHtml +
-    '<div class="total-row"><span class="total-label">' + t('grand_total') + '</span><span class="total-val">₹' + price + '</span></div>' +
-    (advance > 0 ? '<div class="payment-row"><span class="l">' + t('advance_payment') + '</span><span class="advance">₹' + advance + '</span></div>' : '') +
-    (advance > 0 ? '<div class="payment-row"><span class="l" style="font-weight:800">' + t('due_amount') + '</span><span class="due">₹' + dueAmount + '</span></div>' : '') +
-    '</div></body></html>';
+  // Use base64 for HTML so images render in PDF/print (local URIs are blocked by HTML renderer)
+  const logoHtml = logoBase64
+    ? `<div style="text-align:center;margin-bottom:12px"><img src="${logoBase64}" style="max-height:80px;max-width:200px;object-fit:contain;border-radius:8px" /></div>`
+    : '';
+
+  const [isPreparingPDF, setIsPreparingPDF] = React.useState(false);
+
+  const generateHtml = async () => {
+    // Use the already converted base64 strings from state
+    const lB64 = logoBase64;
+    const dB64 = designImageBase64;
+
+    const lHtml = lB64
+      ? `<div style="text-align:center;margin-bottom:12px"><img src="${lB64}" width="200" style="max-height:80px;object-fit:contain;border-radius:8px" /></div>`
+      : '';
+    
+    const mEntries = billData.measurements ? Object.entries(billData.measurements).filter(([_, v]) => v !== '') : [];
+    const mHtml = mEntries.length > 0 
+      ? `<div class="section"><div class="st">${t('precision_measurements')}</div><div class="meas-grid">` + 
+        mEntries.map(([k, v]) => '<div class="meas-item"><span class="meas-val">' + v + '"</span><span class="meas-lab">' + k + '</span></div>').join('') + 
+        '</div></div>'
+      : '';
+
+    return '<html><head><style>' +
+      'body { font-family: "Helvetica"; padding: 40px; background-color: #F8F9F5; color: #344E41; }' +
+      '.container { max-width: 600px; margin: auto; border: 1px solid #EDF1E4; border-radius: 20px; padding: 30px; background-color: #FFFFFF; box-shadow: 0 4px 20px rgba(52, 78, 65, 0.05); }' +
+      'h1 { text-align: center; color: #344E41; margin-bottom: 4px; font-weight: 800; letter-spacing: 2px; }' +
+      '.sub { text-align: center; color: #6B705C; margin-bottom: 20px; text-transform: uppercase; font-size: 11px; letter-spacing: 3px; font-weight: 700; }' +
+      '.bill-meta { text-align: center; color: #6B705C; font-size: 12px; margin-bottom: 20px; }' +
+      '.section { border-bottom: 1px solid #EDF1E4; padding: 15px 0; }' +
+      '.st { font-weight: 800; color: #344E41; margin-bottom: 10px; text-transform: uppercase; font-size: 11px; letter-spacing: 1.5px; }' +
+      '.row { display: flex; justify-content: space-between; padding: 8px 0; }' +
+      '.l { color: #6B705C; font-size: 14px; }' +
+      '.v { font-weight: 700; color: #344E41; font-size: 14px; }' +
+      '.total-row { display: flex; justify-content: space-between; margin-top: 15px; padding-top: 15px; border-top: 2px dashed #A3B18A; }' +
+      '.total-label { font-size: 18px; font-weight: 800; }' +
+      '.total-val { font-size: 24px; font-weight: 900; color: #344E41; }' +
+      '.payment-row { display: flex; justify-content: space-between; padding: 6px 0; }' +
+      '.advance { color: #16A34A; font-weight: 700; }' +
+      '.due { color: #DC2626; font-weight: 800; font-size: 18px; }' +
+      '.meas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }' +
+      '.meas-item { background: #F8F9F5; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #EDF1E4; }' +
+      '.meas-val { font-weight: 800; font-size: 14px; display: block; color: #344E41; }' +
+      '.meas-lab { font-size: 9px; color: #6B705C; text-transform: uppercase; margin-top: 2px; font-weight: 700; }' +
+      '.design-img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; margin-top: 10px; }' +
+      '</style></head><body>' +
+      '<div class="container">' +
+      lHtml +
+      '<h1>' + shopName + '</h1><div class="sub">' + t('receipt_sub') + '</div>' +
+      '<div class="bill-meta">' + t('bill_date') + ': ' + billDate + ' | ' + t('bill_time') + ': ' + billTime + '</div>' +
+      '<div class="section"><div class="st">' + t('client_info') + '</div>' +
+      '<div class="row"><span class="l">' + t('full_name_label').replace(' *', '') + '</span><span class="v">' + billData.clientName + '</span></div>' +
+      '<div class="row"><span class="l">' + t('phone_placeholder') + '</span><span class="v">' + billData.phone + '</span></div>' +
+      '</div>' +
+      '<div class="section"><div class="st">' + t('order_info') + '</div>' +
+      '<div class="row"><span class="l">' + t('category') + '</span><span class="v">' + billData.item + '</span></div>' +
+      '<div class="row"><span class="l">' + t('handover_date') + '</span><span class="v">' + deliveryDate + '</span></div>' +
+      '</div>' + mHtml +
+      (dB64 ? '<div class="section"><div class="st">Sample Image</div><img src="' + dB64 + '" class="design-img" width="100%" /></div>' : '') +
+      '<div class="total-row"><span class="total-label">' + t('grand_total') + '</span><span class="total-val">₹' + price + '</span></div>' +
+      (advance > 0 ? '<div class="payment-row"><span class="l">' + t('advance_payment') + '</span><span class="advance">₹' + advance + '</span></div>' : '') +
+      (advance > 0 ? '<div class="payment-row"><span class="l" style="font-weight:800">' + t('due_amount') + '</span><span class="due">₹' + dueAmount + '</span></div>' : '') +
+      '</div></body></html>';
+  };
+
+  const handlePrint = async () => {
+    setIsPreparingPDF(true);
+    try { 
+      const html = await generateHtml();
+      const { uri } = await Print.printToFileAsync({ html }); 
+      await Print.printAsync({ uri }); 
+    } catch (e) { 
+      Alert.alert('Error', 'Could not print'); 
+    } finally {
+      setIsPreparingPDF(false);
+    }
+  };
+
+  const handleSharePDF = async () => {
+    setIsPreparingPDF(true);
+    try { 
+      const html = await generateHtml();
+      const { uri } = await Print.printToFileAsync({ html }); 
+      await Sharing.shareAsync(uri); 
+    } catch (e) { 
+      Alert.alert('Error', 'Could not share'); 
+    }
+  };
 
   const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       const customerRes = await createCustomer({ 
         name: billData.clientName, 
@@ -108,7 +202,8 @@ export default function BillPreviewScreen({ route, navigation }: any) {
         price: totalPrice,
         advancePayment: advance,
         deliveryDate: deliveryDate || null,
-        notes: ''
+        notes: '',
+        image: designImageUri || '',
       });
 
       const newOrder = { 
@@ -128,13 +223,27 @@ export default function BillPreviewScreen({ route, navigation }: any) {
       
       Alert.alert(t('success'), t('save_success'), [{ text: 'OK', onPress: () => navigation.navigate('MainTabs') }]);
     } catch (e: any) { 
-      console.error(e);
-      // Handle client limit error
-      if (e.response?.data?.code === 'CLIENT_LIMIT_REACHED') {
-        Alert.alert(t('client_limit_reached'), e.response.data.message);
-      } else {
-        Alert.alert('Error', e.response?.data?.message || t('save_error')); 
+      console.log('--- ORDER FINALIZE ERROR ---');
+      if (e.response) {
+        console.log('Status Code:', e.response.status);
       }
+      const data = e.response?.data;
+      if (data?.code === 'NO_SUBSCRIPTION' || data?.code === 'CLIENT_LIMIT_REACHED') {
+        const isLimit = data.code === 'CLIENT_LIMIT_REACHED';
+        const title = isLimit ? 'Plan Limit Reached' : 'Subscription Required';
+        const message = isLimit 
+          ? "You have reached the client limit for your current plan. Please upgrade to continue saving new orders."
+          : "An active subscription is required to save clients and designs. Choose a plan to continue managing your business.";
+
+        Alert.alert(title, message, [
+          { text: 'Later', style: 'cancel' },
+          { text: 'View Plans', onPress: () => navigation.navigate('Subscription'), style: 'default' }
+        ]);
+      } else {
+        Alert.alert('Save Error', 'Something went wrong while saving the order. Please check your connection and try again.');
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -152,16 +261,8 @@ export default function BillPreviewScreen({ route, navigation }: any) {
     });
   };
 
-  const handlePrint = async () => {
-    try { const { uri } = await Print.printToFileAsync({ html: receiptHtml }); await Print.printAsync({ uri }); } catch (e) { Alert.alert('Error', 'Could not print'); }
-  };
-
-  const handleSharePDF = async () => {
-    try { const { uri } = await Print.printToFileAsync({ html: receiptHtml }); await Sharing.shareAsync(uri); } catch (e) { Alert.alert('Error', 'Could not share'); }
-  };
-
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container}>
       <LinearGradient 
         colors={Colors.gradientPrimary as [string, string]} 
         style={styles.headerGradient}
@@ -177,8 +278,26 @@ export default function BillPreviewScreen({ route, navigation }: any) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.billCard}>
+          {/* Company Logo (on-screen) */}
+          {logoBase64 ? (
+            <Image
+              source={{ uri: logoBase64 }}
+              style={styles.companyLogoPreview}
+              resizeMode="contain"
+            />
+          ) : null}
           <Text style={styles.shopTitle}>{shopName}</Text>
           <Text style={styles.shopSub}>{t('receipt_sub')}</Text>
+
+          {/* Image Status Monitor (for user debug) */}
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 10 }}>
+            {tailorProfile?.logo && <View style={{ backgroundColor: logoBase64 ? '#E8F5E9' : '#FFEBEE', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+              <Text style={{ fontSize: 9, color: logoBase64 ? '#2E7D32' : '#C62828', fontWeight: 'bold' }}>Logo: {logoBase64 ? 'Ready' : '...'}</Text>
+            </View>}
+            {billData.designImage && <View style={{ backgroundColor: designImageBase64 ? '#E8F5E9' : '#FFEBEE', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+              <Text style={{ fontSize: 9, color: designImageBase64 ? '#2E7D32' : '#C62828', fontWeight: 'bold' }}>Image: {designImageBase64 ? 'Ready' : '...'}</Text>
+            </View>}
+          </View>
 
           {/* Bill Date & Time */}
           <View style={styles.dateTimeRow}>
@@ -227,6 +346,18 @@ export default function BillPreviewScreen({ route, navigation }: any) {
             </View>
           )}
 
+          {/* Design Reference Image */}
+          {designImageUri && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Sample Image</Text>
+              <Image
+                source={{ uri: designImageUri }}
+                style={styles.designImagePreview}
+                resizeMode="cover"
+              />
+            </View>
+          )}
+
           {/* Total Amount */}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>{t('grand_total')}</Text>
@@ -269,10 +400,16 @@ export default function BillPreviewScreen({ route, navigation }: any) {
         </View>
 
         <View style={styles.footerActions}>
-          <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={styles.actionBtn}>
+          <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={styles.actionBtn} disabled={isSaving}>
             <LinearGradient colors={['#344E41', '#1B2621']} style={styles.actionGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-              <Ionicons name="sparkles-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.actionText}>{t('finalize_save')}</Text>
+              {isSaving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="sparkles-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.actionText}>{t('finalize_save')}</Text>
+                </>
+              )}
             </LinearGradient>
           </TouchableOpacity>
 
@@ -288,13 +425,33 @@ export default function BillPreviewScreen({ route, navigation }: any) {
           </View>
 
           <View style={styles.shareRow}>
-            <TouchableOpacity style={[styles.shareBtn, { backgroundColor: '#6B705C' }]} onPress={handleSharePDF}>
-              <Ionicons name="document-text-outline" size={18} color="#fff" />
-              <Text style={styles.shareBtnText}>{t('share_pdf')}</Text>
+            <TouchableOpacity 
+              style={[styles.shareBtn, { backgroundColor: '#6B705C' }]} 
+              onPress={handleSharePDF}
+              disabled={isPreparingPDF || !isImagesReady}
+            >
+              {isPreparingPDF || !isImagesReady ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="document-text-outline" size={18} color="#fff" />
+                  <Text style={styles.shareBtnText}>{t('share_pdf')}</Text>
+                </>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.shareBtn, { backgroundColor: '#344E41' }]} onPress={handlePrint}>
-              <Ionicons name="print-outline" size={18} color="#fff" />
-              <Text style={styles.shareBtnText}>{t('print')}</Text>
+            <TouchableOpacity 
+              style={[styles.shareBtn, { backgroundColor: '#344E41' }]} 
+              onPress={handlePrint}
+              disabled={isPreparingPDF || !isImagesReady}
+            >
+              {isPreparingPDF || !isImagesReady ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="print-outline" size={18} color="#fff" />
+                  <Text style={styles.shareBtnText}>{t('print')}</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -367,5 +524,11 @@ const styles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
     fontSize: 14, color: Colors.textDark, fontWeight: '700',
     minWidth: 120, textAlign: 'right'
+  },
+  designImagePreview: {
+    width: '100%', height: 180, borderRadius: 12, marginTop: 8,
+  },
+  companyLogoPreview: {
+    width: 80, height: 80, alignSelf: 'center', marginBottom: 8, borderRadius: 8,
   },
 });

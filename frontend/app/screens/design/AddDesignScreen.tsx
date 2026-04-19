@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Image, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
@@ -39,9 +39,19 @@ export default function AddDesignScreen({ navigation }: any) {
     setMeasurements(measurements.filter(m => m !== item));
   };
 
-  const [tempImage, setTempImage] = useState('');
-
   const handlePickImage = async () => {
+    if (Platform.OS === 'android') {
+      Alert.alert(
+        'Quick Guide',
+        'After selecting and cropping your image, look for the checkmark (✓) at the top right to save.',
+        [{ text: 'Got it', onPress: () => startPicker() }]
+      );
+    } else {
+      startPicker();
+    }
+  };
+
+  const startPicker = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -58,17 +68,8 @@ export default function AddDesignScreen({ navigation }: any) {
         Alert.alert('Image Too Large', 'Please select a smaller image or take a new photo with lower resolution.');
         return;
       }
-      setTempImage(`data:${asset.mimeType || 'image/jpeg'};base64,${base64Str}`);
+      setImage(`data:${asset.mimeType || 'image/jpeg'};base64,${base64Str}`);
     }
-  };
-
-  const handleConfirmImage = () => {
-    setImage(tempImage);
-    setTempImage('');
-  };
-
-  const handleCancelImage = () => {
-    setTempImage('');
   };
 
   const handleSaveDesign = async () => {
@@ -161,42 +162,21 @@ export default function AddDesignScreen({ navigation }: any) {
             ))}
           </View>
 
-          {/* Image Preview with Done/Cancel or Pick */}
-          {tempImage ? (
-            <View>
-              <View style={styles.imagePickerBtn}>
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: tempImage }} style={styles.previewImage} resizeMode="cover" />
-                </View>
-              </View>
-              <View style={styles.imageActionRow}>
-                <TouchableOpacity style={styles.imageCancelBtn} onPress={handleCancelImage}>
-                  <Ionicons name="close" size={18} color="#DC2626" />
-                  <Text style={styles.imageCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.imageDoneBtn} onPress={handleConfirmImage}>
-                  <Ionicons name="checkmark" size={18} color="#FFF" />
-                  <Text style={styles.imageDoneText}>Done</Text>
+          <TouchableOpacity onPress={handlePickImage} style={styles.imagePickerBtn} activeOpacity={0.8}>
+            {image ? (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
+                <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImage('')}>
+                  <Ionicons name="close-circle" size={28} color="#FF6347" />
                 </TouchableOpacity>
               </View>
-            </View>
-          ) : (
-            <TouchableOpacity onPress={handlePickImage} style={styles.imagePickerBtn} activeOpacity={0.8}>
-              {image ? (
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
-                  <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImage('')}>
-                    <Ionicons name="close-circle" size={28} color="#FF6347" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.imagePlaceholder}>
-                  <Ionicons name="image-outline" size={36} color={Colors.primary} />
-                  <Text style={styles.imagePlaceholderText}>Upload Image (Optional)</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Ionicons name="image-outline" size={36} color={Colors.primary} />
+                <Text style={styles.imagePlaceholderText}>Upload Image (Optional)</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -235,8 +215,14 @@ export default function AddDesignScreen({ navigation }: any) {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" />
-            <Text style={styles.saveBtnText}>{loading ? 'Saving...' : 'Save Design'}</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" />
+                <Text style={styles.saveBtnText}>{t('save_design')}</Text>
+              </>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </KeyboardAwareScrollView>

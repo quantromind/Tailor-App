@@ -137,7 +137,10 @@ export default function SubscriptionScreen({ navigation }: any) {
       setPlans(plansRes.data);
       setActiveSub(subRes.data);
     } catch (err) {
-      console.error('Failed to load subscription data:', err);
+      console.log('--- DATA LOAD ERROR ---');
+      console.error(err);
+      console.log('-----------------------');
+      showAlert('Connection Issue', 'Failed to load subscription plans. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -184,12 +187,12 @@ export default function SubscriptionScreen({ navigation }: any) {
 
       // Step 2: Open Razorpay checkout
       const options = {
-        description: `${plan.name} Plan - eTailoring Subscription`,
+        description: `${plan.name} Plan - TailorBook Subscription`,
         image: 'https://i.imgur.com/3g7nmJC.png',
         currency: currency,
         key: key,
         amount: amount,
-        name: 'eTailoring',
+        name: 'TailorBook',
         order_id: orderId,
         prefill: {
           contact: profile?.phone || '',
@@ -214,18 +217,29 @@ export default function SubscriptionScreen({ navigation }: any) {
       showAlert('Payment Successful! 🎉', verifyRes.data.message);
       await loadData(); // Refresh data
     } catch (err: any) {
-      console.error('Razorpay error:', err);
-      console.error('Error response:', err?.response?.status, err?.response?.data);
-      if (err?.code === 'PAYMENT_CANCELLED' || err?.description?.includes('cancelled')) {
-        showAlert('Cancelled', 'Payment was cancelled.');
+      // Detailed logging for developers (visible in terminal)
+      console.log('\n❌ [SUBSCRIPTION ERROR]');
+      console.log('Context: processRazorpayPayment');
+      console.log('Error Code:', err?.code);
+      console.log('Error Description:', err?.description);
+      if (err?.response) {
+        console.log('API Status:', err.response.status);
+        console.log('API Data:', JSON.stringify(err.response.data, null, 2));
       } else {
-        const errorMsg = err?.response?.data?.error 
-          || err?.response?.data?.message 
-          || err?.description 
-          || 'Something went wrong. Please try again.';
+        console.log('Full Error:', err);
+      }
+      if (err?.stack) console.log('Stack:', err.stack);
+      console.log('------------------------\n');
+
+      if (err?.code === 'PAYMENT_CANCELLED' || err?.description?.includes('cancelled')) {
+        showAlert('Cancelled', 'Payment process was cancelled.');
+      } else {
+        // Professional clean message for users
+        const cleanMsg = "We're sorry, but the subscription process could not be completed at this time. This may be due to a network issue or a temporary service interruption.\n\nPlease try again in a few minutes. If the problem persists, please reach out to our support team.";
+        
         showAlert(
-          'Payment Failed',
-          errorMsg
+          'Subscription Error',
+          cleanMsg
         );
       }
     } finally {

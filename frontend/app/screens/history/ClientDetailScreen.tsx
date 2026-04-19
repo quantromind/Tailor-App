@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator, Modal } from 'react-native';
+import { Alert, Image, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator, Modal } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../../src/constants/colors';
@@ -33,6 +35,13 @@ export default function ClientDetailScreen({ route, navigation }: any) {
   const [editOrderPrice, setEditOrderPrice] = useState('');
   const [editOrderDate, setEditOrderDate] = useState('');
   const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
+  const [tailorProfile, setTailorProfile] = useState<any>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@tailor_profile').then(data => {
+      if (data) setTailorProfile(JSON.parse(data));
+    });
+  }, []);
 
   useEffect(() => {
     loadClientOrders();
@@ -125,10 +134,23 @@ export default function ClientDetailScreen({ route, navigation }: any) {
     }
   };
 
+  // Helper: convert local file URI to base64 data URI for HTML rendering
+  const uriToBase64 = async (uri: string): Promise<string | null> => {
+    try {
+      if (!uri) return null;
+      if (uri.startsWith('data:') || uri.startsWith('http')) return uri;
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpeg';
+      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+      return `data:${mime};base64,${base64}`;
+    } catch { return null; }
+  };
+
   const handleShareWhatsApp = (order: any) => {
     const designName = getDesignName(order);
     const price = getPrice(order);
-    const msg = `*${t('receipt_header')} DETAIL*%0A%0A${t('full_name_label').replace(' *', '')}: ${editedName}%0A${t('category')}: ${designName}%0A${t('grand_total')}: ₹${price}%0AStatus: ${order.status}`;
+    const hasImage = !!(order.image);
+    const msg = `*${t('receipt_header')} DETAIL*%0A%0A${t('full_name_label').replace(' *', '')}: ${editedName}%0A${t('category')}: ${designName}%0A${t('grand_total')}: ₹${price}%0AStatus: ${order.status}${hasImage ? '%0A📎 Design image attached in PDF' : ''}`;
     Linking.openURL(`whatsapp://send?text=${msg}`).catch(() => Alert.alert('Error', t('save_error')));
   };
 
@@ -139,11 +161,25 @@ export default function ClientDetailScreen({ route, navigation }: any) {
       `<div class="meas-item"><span class="meas-val">${m.value}"</span><span class="meas-lab">${m.name}</span></div>`
     ).join('') || '';
 
+    // Convert design image to base64 for embedding
+    const imageBase64 = order.image ? await uriToBase64(order.image) : null;
+    const imageHtml = imageBase64
+      ? `<div class="section"><div class="st">Sample Image</div><img src="${imageBase64}" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-top:10px" /></div>`
+      : '';
+
+    const logoUri = tailorProfile?.logo || null;
+    const logoBase64 = logoUri ? await uriToBase64(logoUri) : null;
+    const shopName = tailorProfile?.companyName || 'TailorBook';
+    const logoHtml = logoBase64
+      ? `<div style="text-align:center;margin-bottom:12px"><img src="${logoBase64}" style="max-height:80px;max-width:200px;object-fit:contain;border-radius:8px" /></div>`
+      : '';
+
     const html = `<html><head><style>
       body { font-family: Helvetica; padding: 40px; background: #F8F9F5; color: #344E41; }
       .container { max-width: 600px; margin: auto; border: 1px solid #EDF1E4; border-radius: 20px; padding: 30px; background: #FFF; }
       h1 { text-align: center; font-weight: 800; } .sub { text-align: center; color: #6B705C; margin-bottom: 30px; }
       .section { border-bottom: 1px solid #EDF1E4; padding: 15px 0; }
+      .st { font-weight: 800; color: #344E41; margin-bottom: 10px; text-transform: uppercase; font-size: 11px; letter-spacing: 1.5px; }
       .row { display: flex; justify-content: space-between; padding: 8px 0; }
       .l { color: #6B705C; } .v { font-weight: 700; }
       .meas-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 10px; }
@@ -151,10 +187,12 @@ export default function ClientDetailScreen({ route, navigation }: any) {
       .meas-val { font-weight: 800; display: block; } .meas-lab { font-size: 9px; color: #6B705C; text-transform: uppercase; }
       .total-row { display: flex; justify-content: space-between; margin-top: 25px; padding-top: 20px; border-top: 2px dashed #A3B18A; }
     </style></head><body><div class="container">
-      <h1>${t('receipt_header')}</h1><div class="sub">${t('receipt_sub')}</div>
+      ${logoHtml}
+      <h1>${shopName}</h1><div class="sub">${t('receipt_sub')}</div>
       <div class="section"><div class="row"><span class="l">Name</span><span class="v">${editedName}</span></div></div>
       <div class="section"><div class="row"><span class="l">Design</span><span class="v">${designName}</span></div></div>
-      ${measHtml ? `<div class="section"><div class="meas-grid">${measHtml}</div></div>` : ''}
+      ${measHtml ? `<div class="section"><div class="st">Measurements</div><div class="meas-grid">${measHtml}</div></div>` : ''}
+      ${imageHtml}
       <div class="total-row"><span>Total</span><span style="font-size:22px;font-weight:900">₹${price}</span></div>
     </div></body></html>`;
 
@@ -347,6 +385,18 @@ export default function ClientDetailScreen({ route, navigation }: any) {
                     </View>
                   )}
 
+                  {/* Design Reference Image */}
+                  {order.image ? (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={[styles.sectionLabel, { marginBottom: 8 }]}>Sample Image</Text>
+                      <Image
+                        source={{ uri: order.image }}
+                        style={styles.orderDesignImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  ) : null}
+
                   {/* Share for this specific order */}
                   <View style={[styles.shareRow, { marginTop: 16 }]}>
                     <TouchableOpacity style={[styles.shareBtnMini, { backgroundColor: '#25D366' }]} onPress={() => handleShareWhatsApp(order)}>
@@ -486,6 +536,7 @@ const styles = StyleSheet.create({
   },
   measureLabel: { fontSize: 10, color: Colors.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontWeight: '700' },
   measureValue: { fontSize: 18, fontWeight: '800', color: Colors.primary },
+  loadingContainer: { paddingVertical: 40, alignItems: 'center', justifyContent: 'center' },
   emptyContainer: { alignItems: 'center', marginTop: 60, gap: 16 },
   emptyText: { color: Colors.textLight, fontSize: 16, fontWeight: '600' },
   input: {
@@ -518,4 +569,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, borderRadius: 16, padding: 16, alignItems: 'center'
   },
   saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14, letterSpacing: 1 },
+  orderDesignImage: {
+    width: '100%', height: 180, borderRadius: 14,
+    borderWidth: 1, borderColor: Colors.border,
+  },
 });

@@ -23,7 +23,7 @@ export default function HomeScreen() {
                         size={34}
                         color="#8B4513"
                     />
-                    <Text style={styles.appName}>eTailoring</Text>
+                    <Text style={styles.appName}>TailorBook</Text>
                 </View>
 
                 {/* Welcome */}

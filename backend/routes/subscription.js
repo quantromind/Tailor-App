@@ -195,17 +195,23 @@ router.get('/active', auth, async (req, res) => {
             { status: 'expired' }
         );
 
-        const subscription = await Subscription.findOne({
+        let subscription = await Subscription.findOne({
             user: req.user.userId,
             status: 'active'
         }).sort({ createdAt: -1 });
 
         if (!subscription) {
+            const User = require('../models/User');
+            const user = await User.findById(req.user.userId);
+            const clientCount = await Customer.countDocuments({ createdBy: req.user.userId });
+            
             return res.json({
-                hasSubscription: false,
-                plan: null,
-                clientsUsed: 0,
-                clientLimit: 0
+                hasSubscription: user.subscriptionPlan !== 'free',
+                plan: user.subscriptionPlan || 'free',
+                planName: user.subscriptionPlan === 'free' ? 'Free Trial' : user.subscriptionPlan,
+                clientsUsed: clientCount,
+                clientLimit: user.clientLimit || 30,
+                isFreePlan: true
             });
         }
 
@@ -284,13 +290,31 @@ router.post('/subscribe', auth, async (req, res) => {
 // GET /api/subscription/check-limit - Check if user can add more clients
 router.get('/check-limit', auth, async (req, res) => {
     try {
-        const subscription = await Subscription.findOne({
+        let subscription = await Subscription.findOne({
             user: req.user.userId,
             status: 'active',
             endDate: { $gte: new Date() }
         }).sort({ createdAt: -1 });
 
-        if (!subscription) {
+        let limit = 0;
+        let isFreePlan = false;
+        let planName = '';
+
+        if (subscription) {
+            limit = subscription.clientLimit;
+            planName = PLANS[subscription.plan]?.name || subscription.plan;
+        } else {
+            // Fallback to user model for free trial / base limits
+            const User = require('../models/User');
+            const user = await User.findById(req.user.userId);
+            if (user && user.clientLimit > 0) {
+                limit = user.clientLimit;
+                isFreePlan = true;
+                planName = 'Free';
+            }
+        }
+
+        if (limit === 0 && !isFreePlan) {
             return res.json({
                 canAdd: false,
                 reason: 'No active subscription. Please subscribe to a plan.',
@@ -299,28 +323,31 @@ router.get('/check-limit', auth, async (req, res) => {
         }
 
         // Unlimited plan
-        if (subscription.clientLimit === -1) {
+        if (limit === -1) {
             return res.json({ canAdd: true, remaining: -1 });
         }
 
         const clientCount = await Customer.countDocuments({ createdBy: req.user.userId });
 
-        if (clientCount >= subscription.clientLimit) {
+        if (clientCount >= limit) {
             return res.json({
                 canAdd: false,
-                reason: `You have reached your ${PLANS[subscription.plan]?.name} plan limit of ${subscription.clientLimit} clients. Please upgrade your plan.`,
+                reason: isFreePlan 
+                    ? `You have reached your free limit of ${limit} clients. Please subscribe to a plan.` 
+                    : `You have reached your ${planName} plan limit of ${limit} clients. Please upgrade your plan.`,
                 needsUpgrade: true,
-                currentPlan: subscription.plan,
+                needsSubscription: isFreePlan,
+                currentPlan: isFreePlan ? 'free' : subscription.plan,
                 clientsUsed: clientCount,
-                clientLimit: subscription.clientLimit
+                clientLimit: limit
             });
         }
 
         res.json({
             canAdd: true,
-            remaining: subscription.clientLimit - clientCount,
+            remaining: limit - clientCount,
             clientsUsed: clientCount,
-            clientLimit: subscription.clientLimit
+            clientLimit: limit
         });
     } catch (err) {
         console.error(err);

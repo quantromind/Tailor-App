@@ -19,26 +19,45 @@ router.post('/', auth, async (req, res) => {
         }
 
         // Check subscription client limit before creating new customer
-        const subscription = await Subscription.findOne({
+        let subscription = await Subscription.findOne({
             user: req.user.userId,
             status: 'active',
             endDate: { $gte: new Date() }
         }).sort({ createdAt: -1 });
 
-        if (!subscription) {
+        let limit = 0;
+        let isFreePlan = false;
+
+        if (subscription) {
+            limit = subscription.clientLimit;
+        } else {
+            // Fallback to user model for free trial / base limits
+            const user = await require('../models/User').findById(req.user.userId);
+            if (user && user.clientLimit > 0) {
+                limit = user.clientLimit;
+                isFreePlan = true;
+            }
+        }
+
+        if (limit === 0 && !isFreePlan) {
             return res.status(403).json({ 
+                code: 'NO_SUBSCRIPTION',
                 message: 'No active subscription. Please subscribe to a plan to add clients.',
                 needsSubscription: true
             });
         }
 
-        if (subscription.clientLimit !== -1) {
+        if (limit !== -1) {
             const clientCount = await Customer.countDocuments({ createdBy: req.user.userId });
-            if (clientCount >= subscription.clientLimit) {
+            if (clientCount >= limit) {
                 return res.status(403).json({
-                    message: `Client limit reached (${subscription.clientLimit}). Please upgrade your plan.`,
+                    code: 'CLIENT_LIMIT_REACHED',
+                    message: isFreePlan 
+                        ? `You have reached the free limit of ${limit} clients. Please subscribe to a plan to add more.` 
+                        : `Client limit reached (${limit}). Please upgrade your plan.`,
                     needsUpgrade: true,
-                    currentPlan: subscription.plan
+                    needsSubscription: isFreePlan,
+                    currentPlan: isFreePlan ? 'free' : subscription.plan
                 });
             }
         }

@@ -49,6 +49,10 @@ const orderSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    image: {
+        type: String,
+        default: ''    // base64 or URI of design reference image
+    },
     createdAt: {
         type: Date,
         default: Date.now

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "eTailoringApp",
+    "name": "Tailor Book",
     "slug": "eTailoringApp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/tailorbook_logo.png",
     "scheme": "etailoringapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -40,7 +40,13 @@
         }
       ],
       "expo-font",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Tailor Book to access your photos to upload design images and company logo."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

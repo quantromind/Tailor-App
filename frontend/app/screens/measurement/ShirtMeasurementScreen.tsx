@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState, useEffect } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,6 +34,7 @@ export default function ShirtMeasurementScreen({ route, navigation }: any) {
   const [showAddFields, setShowAddFields] = useState(false);
   const [isExistingMeasurement, setIsExistingMeasurement] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [designImage, setDesignImage] = useState<string | null>(null);
 
   // Auto-fill from last order for this design type
   useEffect(() => {
@@ -62,14 +64,54 @@ export default function ShirtMeasurementScreen({ route, navigation }: any) {
     }
   };
 
+  const pickDesignImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to add a design image.');
+      return;
+    }
+
+    if (Platform.OS === 'android') {
+      Alert.alert(
+        'Quick Guide',
+        'After selecting and cropping your image, look for the checkmark (✓) at the top right to save.',
+        [{ text: 'Got it', onPress: () => startPicker() }]
+      );
+    } else {
+      startPicker();
+    }
+  };
+
+  const startPicker = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.2, // Balanced quality
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]?.base64) {
+      const asset = result.assets[0];
+      setDesignImage(`data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`);
+    }
+  };
+
   const handleCalculateBill = () => {
     if (!clientName || !phone) { Alert.alert('Error', t('error_fill_fields')); return; }
     if (!/^\d{10}$/.test(phone)) { Alert.alert('Error', 'Please enter a valid 10-digit phone number'); return; }
+    
+    const hasAtLeastOneMeasurement = Object.values(measurements).some(val => val && val.trim() !== '');
+    if (!hasAtLeastOneMeasurement) {
+      Alert.alert('Error', 'Add atleast one field');
+      return;
+    }
+
     const price = calculatePrice('Shirt');
     navigation.navigate('BillPreview', {
       billData: { 
         clientName, phone, gender, item: item.name, type: 'Shirt',
-        measurements, price, deliveryDate: new Date(Date.now() + 7 * 86400000).toLocaleDateString() 
+        measurements, price,
+        deliveryDate: new Date(Date.now() + 7 * 86400000).toLocaleDateString(),
+        designImage: designImage || null,
       },
     });
   };
@@ -175,6 +217,28 @@ export default function ShirtMeasurementScreen({ route, navigation }: any) {
           )}
         </View>
 
+        {/* Sample Image */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sample Image</Text>
+          <TouchableOpacity onPress={pickDesignImage} style={styles.imagePickerBtn} activeOpacity={0.8}>
+            {designImage ? (
+              <Image source={{ uri: designImage }} style={styles.designImagePreview} resizeMode="cover" />
+            ) : (
+              <View style={styles.imagePickerPlaceholder}>
+                <Ionicons name="camera-outline" size={32} color={Colors.textLight} />
+                <Text style={styles.imagePickerText}>Tap to add sample image</Text>
+                <Text style={styles.imagePickerSubText}>(Optional)</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          {designImage && (
+            <TouchableOpacity onPress={() => setDesignImage(null)} style={styles.removeImageBtn}>
+              <Ionicons name="close-circle" size={20} color={Colors.error} />
+              <Text style={styles.removeImageText}>Remove Image</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <TouchableOpacity onPress={handleCalculateBill} activeOpacity={0.85} style={styles.calculateBtn}>
           <LinearGradient 
             colors={Colors.gradientSecondary as [string, string]} 
@@ -238,4 +302,11 @@ const styles = StyleSheet.create({
   editToggleText: { fontSize: 12, fontWeight: '700', color: Colors.textLight },
   autoFillBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#4CAF5015', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, marginBottom: 14, borderWidth: 1, borderColor: '#4CAF5040' },
   autoFillText: { fontSize: 12, fontWeight: '700', color: '#4CAF50', flex: 1 },
+  imagePickerBtn: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
+  imagePickerPlaceholder: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 8, backgroundColor: Colors.surfaceAlt },
+  imagePickerText: { fontSize: 14, fontWeight: '700', color: Colors.textLight },
+  imagePickerSubText: { fontSize: 11, color: Colors.textLight },
+  designImagePreview: { width: '100%', height: 200 },
+  removeImageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, alignSelf: 'center' },
+  removeImageText: { fontSize: 13, fontWeight: '700', color: Colors.error },
 });
