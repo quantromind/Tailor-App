@@ -16,18 +16,7 @@ export const createCustomDesign = async (data: {
   image?: string;
   description?: string;
   measurements?: string[];
-  price?: number;
 }) => {
   const response = await API.post('/designs/custom', data);
-  return response.data;
-};
-
-export const getUserDesigns = async () => {
-  const response = await API.get('/designs/user/all');
-  return response.data;
-};
-
-export const deleteDesign = async (id: string) => {
-  const response = await API.delete(`/designs/custom/${id}`);
   return response.data;
 };

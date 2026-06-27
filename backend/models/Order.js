@@ -25,33 +25,30 @@ const orderSchema = new mongoose.Schema({
     measurements: [measurementSchema],
     status: {
         type: String,
-        enum: ['pending', 'in-progress', 'completed', 'delivered', 'cancelled'],
+        enum: ['pending', 'in-progress', 'completed', 'delivered'],
         default: 'pending'
     },
     notes: {
         type: String,
         default: ''
     },
-    price: {
-        type: Number,
-        default: 0
+    paymentStatus: {
+        type: String,
+        enum: ['unpaid', 'paid', 'failed'],
+        default: 'unpaid'
     },
-    advancePayment: {
-        type: Number,
-        default: 0
+    paymentId: {
+        type: String,
+        default: ''
     },
-    deliveryDate: {
-        type: Date,
-        default: null
+    razorpayOrderId: {
+        type: String,
+        default: ''
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
-    },
-    image: {
-        type: String,
-        default: ''    // base64 or URI of design reference image
     },
     createdAt: {
         type: Date,

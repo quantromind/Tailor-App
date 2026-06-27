@@ -2,26 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Image, ActivityIndicator, Platform } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Typography } from '../../../src/constants/colors';
 import { createCustomDesign } from '../../../api';
 
-const CATEGORIES = [
-  { key: 'mens', label: "Men's", icon: 'man-outline' },
-  { key: 'womens', label: "Women's", icon: 'woman-outline' },
-  { key: 'kids', label: "Kids", icon: 'happy-outline' },
-];
-
 export default function AddDesignScreen({ navigation }: any) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
   const [image, setImage] = useState('');
-  const [category, setCategory] = useState('mens');
   const [measurementTag, setMeasurementTag] = useState('');
   const [measurements, setMeasurements] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,35 +32,17 @@ export default function AddDesignScreen({ navigation }: any) {
   };
 
   const handlePickImage = async () => {
-    if (Platform.OS === 'android') {
-      Alert.alert(
-        'Quick Guide',
-        'After selecting and cropping your image, look for the checkmark (✓) at the top right to save.',
-        [{ text: 'Got it', onPress: () => startPicker() }]
-      );
-    } else {
-      startPicker();
-    }
-  };
-
-  const startPicker = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.1,
+      quality: 0.8,
       base64: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
-      const base64Str = asset.base64 || '';
-      // Check size — base64 adds ~33% overhead, limit to ~5MB raw
-      if (base64Str.length > 7_000_000) {
-        Alert.alert('Image Too Large', 'Please select a smaller image or take a new photo with lower resolution.');
-        return;
-      }
-      setImage(`data:${asset.mimeType || 'image/jpeg'};base64,${base64Str}`);
+      setImage(`data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`);
     }
   };
 
@@ -79,20 +53,18 @@ export default function AddDesignScreen({ navigation }: any) {
     }
     setLoading(true);
     try {
-      console.log('[AddDesign] Saving design:', { name, category, hasImage: !!image, measurements });
       await createCustomDesign({ 
         name, 
-        category,
-        image: image || undefined, 
+        category: 'mens', // default to mens for now, user can choose later or it can be generic
+        image, 
         description, 
-        measurements,
-        price: price ? Number(price) : 0 
+        measurements 
       });
       Alert.alert('Success', 'Design saved successfully', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (e: any) {
-      console.error('[AddDesign] Save error:', e?.response?.data || e.message);
+      console.error(e);
       Alert.alert('Error', e.response?.data?.message || 'Failed to save design');
     } finally {
       setLoading(false);
@@ -132,36 +104,6 @@ export default function AddDesignScreen({ navigation }: any) {
             onChangeText={setDescription} 
             placeholderTextColor={Colors.textLight} 
           />
-          <TextInput 
-            style={styles.input} 
-            placeholder="Price (₹) (Optional)" 
-            keyboardType="numeric"
-            value={price} 
-            onChangeText={setPrice} 
-            placeholderTextColor={Colors.textLight} 
-          />
-
-          {/* Category Picker */}
-          <Text style={styles.categoryLabel}>Category</Text>
-          <View style={styles.categoryRow}>
-            {CATEGORIES.map((cat) => (
-              <TouchableOpacity
-                key={cat.key}
-                style={[styles.categoryChip, category === cat.key && styles.categoryChipActive]}
-                onPress={() => setCategory(cat.key)}
-              >
-                <Ionicons 
-                  name={cat.icon as any} 
-                  size={18} 
-                  color={category === cat.key ? '#FFF' : Colors.textLight} 
-                />
-                <Text style={[styles.categoryText, category === cat.key && styles.categoryTextActive]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
           <TouchableOpacity onPress={handlePickImage} style={styles.imagePickerBtn} activeOpacity={0.8}>
             {image ? (
               <View style={styles.imagePreviewContainer}>
@@ -215,14 +157,8 @@ export default function AddDesignScreen({ navigation }: any) {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.saveBtnText}>{t('save_design')}</Text>
-              </>
-            )}
+            <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" />
+            <Text style={styles.saveBtnText}>{loading ? 'Saving...' : 'Save Design'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </KeyboardAwareScrollView>
@@ -256,22 +192,6 @@ const styles = StyleSheet.create({
     borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, 
     color: Colors.textDark, marginBottom: 16, fontWeight: '600' 
   },
-  categoryLabel: {
-    fontSize: 12, fontWeight: '700', color: Colors.textLight, 
-    marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1,
-  },
-  categoryRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  categoryChip: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 12, borderRadius: 14, gap: 6,
-    backgroundColor: Colors.surfaceAlt, borderWidth: 1, borderColor: Colors.border,
-  },
-  categoryChipActive: { 
-    backgroundColor: Colors.primary, borderColor: Colors.primary,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8,
-  },
-  categoryText: { fontSize: 13, fontWeight: '800', color: Colors.textLight },
-  categoryTextActive: { color: '#FFF' },
   addRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   addBtn: { backgroundColor: Colors.secondary, paddingHorizontal: 16, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -289,17 +209,4 @@ const styles = StyleSheet.create({
   imagePreviewContainer: { flex: 1, position: 'relative' },
   previewImage: { width: '100%', height: '100%' },
   removeImageBtn: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FFF', borderRadius: 14, padding: 2 },
-  imageActionRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  imageCancelBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 12, borderRadius: 14, gap: 6,
-    backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA',
-  },
-  imageCancelText: { fontSize: 14, fontWeight: '800', color: '#DC2626' },
-  imageDoneBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 12, borderRadius: 14, gap: 6,
-    backgroundColor: Colors.primary, elevation: 2,
-  },
-  imageDoneText: { fontSize: 14, fontWeight: '800', color: '#FFF' },
 });

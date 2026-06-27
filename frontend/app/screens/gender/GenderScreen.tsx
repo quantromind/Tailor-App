@@ -8,15 +8,15 @@ import { Colors, Typography } from '../../../src/constants/colors';
 
 export default function GenderScreen({ route, navigation }: any) {
   const { t } = useTranslation();
-  const { customerType, client } = route.params || { customerType: 'new' };
+  const { customerType } = route.params || { customerType: 'new' };
 
   const handleGenderSelect = (gender: string) => {
-    if (gender === 'male') {
-      navigation.navigate('MaleCategory', { client });
-    } else if (gender === 'female') {
-      navigation.navigate('FemaleCategory', { client });
-    } else if (gender === 'kids') {
-      navigation.navigate('KidsCategory', { client });
+    if (customerType === 'existing') {
+      navigation.navigate('ExistingCust', { gender });
+    } else {
+      if (gender === 'male') navigation.navigate('MaleCategory');
+      else if (gender === 'female') Alert.alert('Info', t('coming_soon'));
+      else if (gender === 'kids') Alert.alert('Info', t('coming_soon'));
     }
   };
 

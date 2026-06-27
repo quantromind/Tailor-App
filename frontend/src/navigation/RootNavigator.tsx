@@ -2,22 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SplashScreen from 'expo-splash-screen';
 import { initI18n } from '../i18n'; // Import initialization function
-import CustomSplashScreen from '../../components/CustomSplashScreen';
-
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync().catch(() => {
-  /* reloading the app might cause this to error */
-});
 
 import LoginScreen from '../../app/screens/auth/LoginScreen';
 import RegisterScreen from '../../app/screens/auth/RegisterScreen';
 import BottomTabs from './BottomTabs';
 import GenderScreen from '../../app/screens/gender/GenderScreen';
 import MaleCategoryScreen from '../../app/screens/male/MaleCategoryScreen';
-import FemaleCategoryScreen from '../../app/screens/female/FemaleCategoryScreen';
-import KidsCategoryScreen from '../../app/screens/kids/KidsCategoryScreen';
 import PantMeasurementScreen from '../../app/screens/measurement/PantMeasurementScreen';
 import ShirtMeasurementScreen from '../../app/screens/measurement/ShirtMeasurementScreen';
 import BillPreviewScreen from '../../app/screens/billing/BillPreviewScreen';
@@ -25,26 +16,30 @@ import ClientDetailScreen from '../../app/screens/history/ClientDetailScreen';
 import ExistingCustScreen from '../../app/screens/home/ExistingCustScreen';
 import LanguageSelectionScreen from '../../app/language-selection';
 import AddDesignScreen from '../../app/screens/design/AddDesignScreen';
-import ViewDesignsScreen from '../../app/screens/design/ViewDesignsScreen';
-import HistoryOrdersScreen from '../../app/screens/history/HistoryOrdersScreen';
-import AddClientScreen from '../../app/screens/home/AddClientScreen';
-import SubscriptionScreen from '../../app/screens/subscription/SubscriptionScreen';
 const Stack = createNativeStackNavigator();
-
-import API from '../../api/config';
 
 export default function RootNavigator() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [hasSelectedLanguage, setHasSelectedLanguage] = useState<boolean | null>(null);
   const [isI18nInitialized, setIsI18nInitialized] = useState(false);
-  const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
 
   useEffect(() => {
     checkInitialState();
     // Test API
-    API.get('/debug/test')
-      .then(res => console.log('[DEBUG] App initialization test (Axios):', res.data))
-      .catch(e => console.error('[DEBUG] App initialization test failed (Axios):', e.message));
+    fetch('http://10.145.237.210:5000/api/debug/test')
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          return res.json();
+        } else {
+          throw new Error("Oops, we haven't got JSON!");
+        }
+      })
+      .then(d => console.log('[DEBUG] App initialization test:', d))
+      .catch(e => console.error('[DEBUG] App initialization test failed:', e.message));
   }, []);
 
   const checkInitialState = async () => {
@@ -74,9 +69,7 @@ export default function RootNavigator() {
     setHasSelectedLanguage(true);
   };
 
-  if (isLoggedIn === null || hasSelectedLanguage === null || !isI18nInitialized || showAnimatedSplash) {
-    return <CustomSplashScreen onAnimationFinish={() => setShowAnimatedSplash(false)} />;
-  }
+  if (isLoggedIn === null || hasSelectedLanguage === null || !isI18nInitialized) return null; // loading
 
   return (
     <NavigationContainer>
@@ -116,18 +109,13 @@ export default function RootNavigator() {
             </Stack.Screen>
             <Stack.Screen name="Gender" component={GenderScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="MaleCategory" component={MaleCategoryScreen} options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="FemaleCategory" component={FemaleCategoryScreen} options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="KidsCategory" component={KidsCategoryScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="PantMeasurement" component={PantMeasurementScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="ShirtMeasurement" component={ShirtMeasurementScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="BillPreview" component={BillPreviewScreen} options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="ClientDetail" component={ClientDetailScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="ExistingCust" component={ExistingCustScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="AddDesign" component={AddDesignScreen} options={{ animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="ViewDesigns" component={ViewDesignsScreen} options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="HistoryOrders" component={HistoryOrdersScreen} options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="AddClient" component={AddClientScreen} options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="MyDesigns" component={AddDesignScreen} options={{ animation: 'slide_from_right' }} />
           </Stack.Group>
         )}
       </Stack.Navigator>
