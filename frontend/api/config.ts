@@ -6,10 +6,8 @@ import { Platform } from 'react-native';
 // iOS simulator and web use localhost directly
 // For physical devices, use your computer's local IP address
 const getBaseUrl = () => {
-  if (Platform.OS === 'android') {
-    return 'http://192.168.1.25:5000/api';
-  }
-  return 'http://localhost:5000/api';
+  // Use production Render backend
+  return 'https://tailor-app-3ole.onrender.com/api';
 };
 
 const API = axios.create({
