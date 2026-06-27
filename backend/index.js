@@ -8,6 +8,7 @@ const customerRoutes = require('./routes/customer');
 const designRoutes = require('./routes/design');
 const orderRoutes = require('./routes/order');
 const paymentRoutes = require('./routes/payment');
+const subscriptionRoutes = require('./routes/subscription');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,6 +23,7 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/designs', designRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 app.get('/api/debug/test', (req, res) => {
     console.log('[DEBUG] Test endpoint reached!');

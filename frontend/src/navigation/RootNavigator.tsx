@@ -16,6 +16,7 @@ import ClientDetailScreen from '../../app/screens/history/ClientDetailScreen';
 import ExistingCustScreen from '../../app/screens/home/ExistingCustScreen';
 import LanguageSelectionScreen from '../../app/language-selection';
 import AddDesignScreen from '../../app/screens/design/AddDesignScreen';
+import SubscriptionScreen from '../../app/screens/subscription/SubscriptionScreen';
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
@@ -116,6 +117,7 @@ export default function RootNavigator() {
             <Stack.Screen name="ExistingCust" component={ExistingCustScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="AddDesign" component={AddDesignScreen} options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="MyDesigns" component={AddDesignScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ animation: 'slide_from_bottom' }} />
           </Stack.Group>
         )}
       </Stack.Navigator>

@@ -4,16 +4,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography } from '../../../src/constants/colors';
 import { useTranslation } from 'react-i18next';
+import { getSubscriptionStatus } from '../../../api';
 
 export default function ProfileScreen({ navigation, onLogout }: any) {
   const { t, i18n } = useTranslation();
   const [profile, setProfile] = useState<any>(null);
+  const [subStatus, setSubStatus] = useState<any>(null);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfile();
+      fetchSubscription();
+    }, [])
+  );
+
+  const fetchSubscription = async () => {
+    try {
+      const status = await getSubscriptionStatus();
+      setSubStatus(status);
+    } catch (e) {
+      console.log('Failed to fetch subscription', e);
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -120,6 +135,56 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
           </View>
         </View>
 
+        {/* Subscription Card */}
+        <View style={styles.card}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Text style={styles.cardTitle}>Subscription</Text>
+            {subStatus?.isActive ? (
+              <View style={styles.badgeActive}><Text style={styles.badgeTextActive}>Active</Text></View>
+            ) : (
+              <View style={styles.badgeFree}><Text style={styles.badgeTextFree}>Free Plan</Text></View>
+            )}
+          </View>
+
+          <View style={styles.infoRow}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="diamond-outline" size={18} color={subStatus?.isActive ? '#FFB703' : Colors.textLight} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Current Plan</Text>
+              <Text style={styles.value}>{subStatus?.plan || 'Free'}</Text>
+            </View>
+          </View>
+
+          {subStatus?.isActive && subStatus?.endDate && (
+            <View style={styles.infoRow}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Valid Until</Text>
+                <Text style={styles.value}>{new Date(subStatus.endDate).toLocaleDateString()}</Text>
+              </View>
+            </View>
+          )}
+
+          {!subStatus?.isActive && (
+            <TouchableOpacity 
+              style={styles.upgradeBtn}
+              onPress={() => navigation.navigate('Subscription')}
+            >
+              <LinearGradient 
+                colors={['#FFB703', '#FB8500']} 
+                style={styles.upgradeGradient}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              >
+                <Ionicons name="flash" size={18} color="#FFF" />
+                <Text style={styles.upgradeText}>Upgrade to Premium</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Settings Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Settings</Text>
@@ -214,4 +279,11 @@ const styles = StyleSheet.create({
     paddingVertical: 18, borderRadius: 16, gap: 10, marginTop: 10, shadowColor: Colors.error, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3
   },
   logoutText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+  badgeActive: { backgroundColor: 'rgba(255, 183, 3, 0.15)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#FFB703' },
+  badgeTextActive: { color: '#FB8500', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  badgeFree: { backgroundColor: 'rgba(107, 112, 92, 0.1)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+  badgeTextFree: { color: Colors.textLight, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  upgradeBtn: { marginTop: 16, borderRadius: 14, overflow: 'hidden' },
+  upgradeGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 8 },
+  upgradeText: { color: '#FFF', fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
 });

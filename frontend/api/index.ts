@@ -4,4 +4,5 @@ export { createCustomer, getCustomers, getCustomerById, searchCustomers } from '
 export { getDesignsByCategory, getAllDesignsByCategory, createCustomDesign } from './design';
 export { createOrder, getOrders, getOrderById, updateOrderStatus } from './order';
 export { createRazorpayOrder, verifyPayment } from './payment';
+export { getSubscriptionStatus, activateSubscription } from './subscription';
 export { default as API } from './config';
