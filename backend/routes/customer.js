@@ -1,5 +1,6 @@
 const express = require('express');
 const Customer = require('../models/Customer');
+const Subscription = require('../models/Subscription');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -9,6 +10,15 @@ router.post('/', auth, async (req, res) => {
     const { name, phone } = req.body;
 
     try {
+        // Enforce Subscription Limit
+        const currentClients = await Customer.countDocuments({ createdBy: req.user.userId });
+        const subscription = await Subscription.findOne({ user: req.user.userId });
+        const maxClients = subscription && subscription.isActive ? (subscription.maxClients || 30) : 30;
+
+        if (currentClients >= maxClients) {
+            return res.status(403).json({ message: 'Client limit reached. Please upgrade your subscription to add more clients.' });
+        }
+
         const customer = new Customer({
             name,
             phone,

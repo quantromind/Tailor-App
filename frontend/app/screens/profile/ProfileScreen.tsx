@@ -148,11 +148,13 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
 
           <View style={styles.infoRow}>
             <View style={styles.iconCircle}>
-              <Ionicons name="diamond-outline" size={18} color={subStatus?.isActive ? '#FFB703' : Colors.textLight} />
+              <Ionicons name="people-outline" size={18} color={Colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Current Plan</Text>
-              <Text style={styles.value}>{subStatus?.plan || 'Free'}</Text>
+              <Text style={styles.label}>Clients Used</Text>
+              <Text style={styles.value}>
+                {subStatus?.currentClients || 0} / {subStatus?.maxClients === 1000000 ? 'Unlimited' : (subStatus?.maxClients || 30)}
+              </Text>
             </View>
           </View>
 

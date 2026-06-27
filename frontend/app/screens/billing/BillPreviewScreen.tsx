@@ -106,7 +106,14 @@ export default function BillPreviewScreen({ route, navigation }: any) {
       Alert.alert(t('success'), t('save_success'), [{ text: 'OK', onPress: () => navigation.navigate('MainTabs') }]);
     } catch (e: any) { 
       console.error(e);
-      Alert.alert('Error', e.response?.data?.message || t('save_error')); 
+      if (e.response?.status === 403) {
+        Alert.alert('Client Limit Reached', e.response?.data?.message, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade Now', onPress: () => navigation.navigate('Subscription') }
+        ]);
+      } else {
+        Alert.alert('Error', e.response?.data?.message || t('save_error')); 
+      }
     }
   };
 
@@ -169,6 +176,15 @@ export default function BillPreviewScreen({ route, navigation }: any) {
     } catch (error: any) {
       console.error('[Payment Error]', error);
       
+      if (error.response?.status === 403) {
+        setIsProcessing(false);
+        Alert.alert('Client Limit Reached', error.response?.data?.message, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade Now', onPress: () => navigation.navigate('Subscription') }
+        ]);
+        return;
+      }
+
       // Razorpay returns error code and description on user cancellation or failure
       if (error?.code === 'PAYMENT_CANCELLED' || error?.description?.includes('cancelled')) {
         Alert.alert('Payment Cancelled', 'You cancelled the payment. You can still save the order without payment.');
