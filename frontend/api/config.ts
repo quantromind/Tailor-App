@@ -23,7 +23,7 @@ const getBaseUrl = () => {
     // 10.0.2.2 is the special alias to your host loopback interface (127.0.0.1 on your development machine)
     // for Android Emulators. 
     // For physical devices, use your computer's local IP address (currently 192.168.1.12)
-    return 'http://192.168.1.12:5000/api';
+    return 'http://192.168.1.31:5000/api';
   }
   return 'http://localhost:5000/api';
 };
