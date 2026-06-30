@@ -128,18 +128,46 @@ export default function SubscriptionScreen({ navigation }: any) {
     }
   }, [loading]);
 
-  const loadData = async () => {
+  const loadData = async (retryCount = 0) => {
     try {
-      const [plansRes, subRes] = await Promise.all([
+      // Fetch plans and active subscription independently
+      // so a failure in one doesn't block the other
+      const [plansResult, subResult] = await Promise.allSettled([
         getPlans(),
         getActiveSubscription(),
       ]);
-      setPlans(plansRes.data);
-      setActiveSub(subRes.data);
+
+      if (plansResult.status === 'fulfilled') {
+        setPlans(plansResult.value.data);
+      } else {
+        console.log('[Subscription] Failed to load plans:', plansResult.reason?.message);
+      }
+
+      if (subResult.status === 'fulfilled') {
+        setActiveSub(subResult.value.data);
+      } else {
+        console.log('[Subscription] Failed to load active sub:', subResult.reason?.message);
+        // Non-critical — user can still see and subscribe to plans
+      }
+
+      // If plans failed, that's critical — show error with retry
+      if (plansResult.status === 'rejected') {
+        if (retryCount < 2) {
+          console.log(`[Subscription] Retrying... (attempt ${retryCount + 2})`);
+          setTimeout(() => loadData(retryCount + 1), 3000);
+          return; // Don't set loading to false yet
+        }
+        showAlert('Connection Issue', 'Failed to load subscription plans. Please check your internet connection and try again.');
+      }
     } catch (err) {
       console.log('--- DATA LOAD ERROR ---');
       console.error(err);
       console.log('-----------------------');
+      if (retryCount < 2) {
+        console.log(`[Subscription] Retrying... (attempt ${retryCount + 2})`);
+        setTimeout(() => loadData(retryCount + 1), 3000);
+        return;
+      }
       showAlert('Connection Issue', 'Failed to load subscription plans. Please check your internet connection and try again.');
     } finally {
       setLoading(false);

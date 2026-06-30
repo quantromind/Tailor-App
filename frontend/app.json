@@ -55,11 +55,11 @@
       "typedRoutes": true,
       "reactCompiler": false
     },
+    "owner": "quantros",
     "extra": {
       "eas": {
-        "projectId": "9343e3b0-1c5b-494d-9488-911ebad1fb70"
+        "projectId": "4956c585-f9f3-4667-9470-14d623eec4a2"
       }
-    },
-    "owner": "sakshi_quantro"
+    }
   }
 }

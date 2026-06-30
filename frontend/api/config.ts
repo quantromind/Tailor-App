@@ -33,7 +33,7 @@ export const SERVER_URL = BASE_URL.replace('/api', '');
 
 const API = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: 30000,
 });
 
 // Attach token to every request if available
