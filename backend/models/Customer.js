@@ -9,11 +9,6 @@ const customerSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    gender: {
-        type: String,
-        enum: ['male', 'female', 'kids'],
-        required: true
-    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -25,7 +20,4 @@ const customerSchema = new mongoose.Schema({
     }
 });
 
-customerSchema.index({ name: 'text', phone: 'text' });
-
 module.exports = mongoose.model('Customer', customerSchema);
-

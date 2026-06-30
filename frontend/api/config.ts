@@ -6,40 +6,32 @@ import { Platform } from 'react-native';
 // iOS simulator and web use localhost directly
 // For physical devices, use your computer's local IP address
 const getBaseUrl = () => {
-  // Production URL (Render)
-  const productionUrl = 'https://tailor-app-y0lq.onrender.com/api';
-
   // Production URL override injected via Expo build
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
 
-  // Use production URL if it's a real build or if specified
-  if (__DEV__ === false) {
-    return productionUrl;
+  if (__DEV__) {
+    // Development mode (running via npx expo start)
+    if (Platform.OS === 'android') {
+      return 'http://192.168.1.31:5000/api';
+    }
+    return 'http://localhost:5000/api';
   }
 
-  if (Platform.OS === 'android') {
-    // 10.0.2.2 is the special alias to your host loopback interface (127.0.0.1 on your development machine)
-    // for Android Emulators. 
-    // For physical devices, use your computer's local IP address (currently 192.168.1.12)
-    return 'http://192.168.1.31:5000/api';
-  }
-  return 'http://localhost:5000/api';
+  // Production mode (APK / AAB builds)
+  return 'https://tailor-app-3ole.onrender.com/api';
 };
 
-const BASE_URL = getBaseUrl();
-export const SERVER_URL = BASE_URL.replace('/api', '');
-
 const API = axios.create({
-  baseURL: BASE_URL,
+  baseURL: getBaseUrl(),
   timeout: 30000,
 });
 
 // Attach token to every request if available
 API.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('@auth_token');
-  console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+  console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   } else {
@@ -67,9 +59,6 @@ API.interceptors.response.use(
           AsyncStorage.removeItem('@auth_token'),
           AsyncStorage.removeItem('@tailor_profile')
         ]);
-        // Note: The app state (isLoggedIn) in RootNavigator will need a way to react to this,
-        // but for now, clearing the token ensures the next app restart or manual action 
-        // will require login.
       }
     } else {
       console.error(`[API Network Error] ${error.config?.url || 'Unknown URL'}`, error.message);

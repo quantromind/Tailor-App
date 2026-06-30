@@ -4,45 +4,30 @@ const subscriptionSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
+        required: true,
+        unique: true // A user should only have one active subscription record that gets updated
     },
     plan: {
         type: String,
-        enum: ['silver', 'gold', 'platinum'],
-        required: true
+        default: 'Free'
     },
-    price: {
+    maxClients: {
         type: Number,
-        required: true
-    },
-    clientLimit: {
-        type: Number, // -1 means unlimited
-        required: true
-    },
-    status: {
-        type: String,
-        enum: ['active', 'expired', 'cancelled'],
-        default: 'active'
+        default: 30
     },
     startDate: {
-        type: Date,
-        default: Date.now
+        type: Date
     },
     endDate: {
-        type: Date,
-        required: true
+        type: Date
     },
-    paymentId: {
-        type: String,
-        default: ''
+    isActive: {
+        type: Boolean,
+        default: false
     },
-    createdAt: {
-        type: Date,
-        default: Date.now
+    razorpayPaymentId: {
+        type: String
     }
-});
-
-// Index for quick lookup of active subscriptions
-subscriptionSchema.index({ user: 1, status: 1 });
+}, { timestamps: true });
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Tailor Book",
+    "name": "eTailoringApp",
     "slug": "eTailoringApp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/tailorbook_logo.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "etailoringapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,26 +14,23 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/tailorbook_logo.png",
-        "backgroundImage": "./assets/images/tailorbook_logo.png",
-        "monochromeImage": "./assets/images/tailorbook_logo.png"
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.sakshi_quantro.eTailoringApp",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "package": "com.sakhee12.eTailoringApp"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/tailorbook_logo.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/tailorbook_logo.png",
+          "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -43,23 +40,17 @@
         }
       ],
       "expo-font",
-      "expo-localization",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow Tailor Book to access your photos to upload design images and company logo."
-        }
-      ]
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
     },
-    "owner": "quantros",
     "extra": {
       "eas": {
         "projectId": "4956c585-f9f3-4667-9470-14d623eec4a2"
       }
-    }
+    },
+    "owner": "quantros"
   }
 }

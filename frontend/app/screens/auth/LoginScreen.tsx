@@ -34,17 +34,9 @@ export default function LoginScreen({ onLogin, onNavigateToRegister }: { onLogin
     try {
       const response = await loginUser({ phone, password });
 
-      // Store token and profile (including subscription info)
+      // Store token and profile
       await AsyncStorage.setItem('@auth_token', response.token);
-      const profileData = { 
-        name: response.name, 
-        phone, 
-        companyName: response.companyName, 
-        userId: response.userId,
-        clientLimit: response.clientLimit || 30,
-        subscriptionPlan: response.subscriptionPlan || 'free',
-        clientCount: response.clientCount || 0
-      };
+      const profileData = { name: response.name, phone, companyName: response.companyName, userId: response.userId };
       await AsyncStorage.setItem('@tailor_profile', JSON.stringify(profileData));
 
       onLogin();
