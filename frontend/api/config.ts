@@ -9,11 +9,11 @@ const getBaseUrl = () => {
   if (__DEV__) {
     // Development mode (running via npx expo start)
     if (Platform.OS === 'android') {
-      return 'http://192.168.1.25:5000/api';
+      return 'http://192.168.1.31:5000/api';
     }
     return 'http://localhost:5000/api';
   }
-  
+
   // Production mode (APK / AAB builds)
   return 'https://tailor-app-3ole.onrender.com/api';
 };

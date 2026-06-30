@@ -27,7 +27,12 @@ app.use('/api/subscriptions', subscriptionRoutes);
 
 app.get('/api/debug/test', (req, res) => {
     console.log('[DEBUG] Test endpoint reached!');
-    res.json({ message: 'Debug test success' });
+    res.json({ 
+        message: 'Debug test success',
+        version: '2.0.0',
+        deployedAt: '2026-06-30',
+        routes: ['auth', 'customers', 'designs', 'orders', 'payment', 'subscriptions']
+    });
 });
 
 // Database Connection
