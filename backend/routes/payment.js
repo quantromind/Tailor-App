@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const auth = require('../middleware/auth');
 const Payment = require('../models/Payment');
 const { getPlanById, calculatePricing } = require('../config/plans');
+const { sendSubscriptionFailure } = require('../utils/mailer');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -201,6 +203,26 @@ router.post('/failure', auth, async (req, res) => {
             payment.status = 'failed';
             payment.failureReason = reason || 'Payment cancelled or failed on client';
             await payment.save();
+
+            // Send failure email (truly non-blocking)
+            if (payment.purpose === 'subscription') {
+                User.findById(req.user.userId).then(user => {
+                    if (user) {
+                        sendSubscriptionFailure({
+                            userName: user.name,
+                            companyName: user.companyName,
+                            userEmail: user.email,
+                            userPhone: user.phone,
+                            planName: payment.planName,
+                            amount: payment.amount,
+                            razorpayOrderId: razorpay_order_id,
+                            failureReason: payment.failureReason,
+                        }).catch(mailErr => {
+                            console.error('[Payment] Failed to send failure email:', mailErr.message);
+                        });
+                    }
+                }).catch(err => console.error('[Payment] Error fetching user for failure email:', err.message));
+            }
         }
         res.json({ success: true });
     } catch (err) {
