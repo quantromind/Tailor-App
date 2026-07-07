@@ -78,8 +78,12 @@ export const PaymentStatusOverlay: React.FC<PaymentStatusOverlayProps> = ({
               <Text style={styles.title}>Payment Failed</Text>
               <Text style={styles.subtitle}>{errorMessage || 'Something went wrong. You have not been charged.'}</Text>
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 22, width: '100%' }}>
-                <Button label="Cancel" variant="outline" onPress={onClose || (() => {})} style={{ flex: 1 }} fullWidth={false} />
-                <Button label="Retry" onPress={onRetry || (() => {})} style={{ flex: 1 }} fullWidth={false} />
+                <View style={{ flex: 1 }}>
+                  <Button label="Cancel" variant="outline" onPress={onClose || (() => {})} fullWidth />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button label="Retry" onPress={onRetry || (() => {})} fullWidth />
+                </View>
               </View>
             </>
           )}
