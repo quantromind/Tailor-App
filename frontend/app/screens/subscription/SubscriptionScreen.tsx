@@ -311,7 +311,10 @@ export default function SubscriptionScreen({ navigation }: any) {
           </View>
         )}
 
-        {selectedPlan && !isCurrentPlan(selectedPlan) && (
+      </ScrollView>
+
+      {selectedPlan && !isCurrentPlan(selectedPlan) && (
+        <View style={styles.footerContainer}>
           <AnimatedPressable style={styles.subscribeBtn} onPress={handleBuyNow} scaleTo={0.97}>
             <View style={styles.subscribeInner}>
               <Ionicons name={selectedPlan.contactSales ? 'call-outline' : 'flash'} size={18} color="#FFF" />
@@ -322,13 +325,12 @@ export default function SubscriptionScreen({ navigation }: any) {
               </Text>
             </View>
           </AnimatedPressable>
-        )}
-
-        <View style={styles.secureRow}>
-          <Ionicons name="shield-checkmark-outline" size={14} color={Colors.textLight} />
-          <Text style={styles.secureText}>Payments secured by Razorpay · signatures verified server-side</Text>
+          <View style={styles.secureRow}>
+            <Ionicons name="shield-checkmark-outline" size={14} color={Colors.textLight} />
+            <Text style={styles.secureText}>Payments secured by Razorpay · signatures verified server-side</Text>
+          </View>
         </View>
-      </ScrollView>
+      )}
 
       <PaymentStatusOverlay
         status={paymentStatus}
@@ -343,7 +345,15 @@ export default function SubscriptionScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 24, paddingBottom: 60 },
+  content: { padding: 24, paddingBottom: 24 },
+  footerContainer: {
+    padding: 24,
+    paddingTop: 16,
+    paddingBottom: 32,
+    backgroundColor: Colors.background,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(52, 78, 65, 0.05)',
+  },
   heroSection: { alignItems: 'center', marginBottom: 24, marginTop: 6 },
   heroIconCircle: {
     width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.primaryLight,
