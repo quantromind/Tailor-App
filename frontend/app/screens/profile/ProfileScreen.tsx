@@ -330,7 +330,11 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
         </View>
 
         {/* Subscription Card */}
-        <View style={styles.card}>
+        <AnimatedPressable 
+          style={styles.card}
+          onPress={() => navigation.navigate('Subscription')}
+          scaleTo={0.98}
+        >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={styles.cardTitle}>Subscription</Text>
             {subStatus?.isActive ? (
@@ -352,13 +356,8 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
             </View>
           </View>
 
-
           {!subStatus?.isActive && (
-            <AnimatedPressable 
-              style={styles.upgradeBtn}
-              onPress={() => navigation.navigate('Subscription')}
-              scaleTo={0.97}
-            >
+            <View style={styles.upgradeBtn}>
               <LinearGradient 
                 colors={Colors.gradientGold as [string, string]} 
                 style={styles.upgradeGradient}
@@ -367,9 +366,9 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
                 <Ionicons name="flash" size={18} color="#FFF" />
                 <Text style={styles.upgradeText}>Upgrade to Premium</Text>
               </LinearGradient>
-            </AnimatedPressable>
+            </View>
           )}
-        </View>
+        </AnimatedPressable>
 
         {/* Settings Card */}
         <View style={styles.card}>
