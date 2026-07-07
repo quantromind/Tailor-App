@@ -30,9 +30,6 @@ const subscriptionSchema = new mongoose.Schema({
     startDate: {
         type: Date
     },
-    endDate: {
-        type: Date
-    },
     isActive: {
         type: Boolean,
         default: false

@@ -21,7 +21,6 @@ router.get('/plans', async (req, res) => {
         features: plan.features,
         popular: plan.popular,
         contactSales: plan.contactSales,
-        durationMonths: plan.durationMonths,
         pricing: plan.contactSales ? null : calculatePricing(plan),
     }));
     res.json(plans);
@@ -47,24 +46,13 @@ async function getStatusHandler(req, res) {
             });
         }
 
-        // Check if subscription has expired
-        const now = new Date();
-        const isExpired = subscription.endDate ? now > subscription.endDate : false;
-
-        if (isExpired && subscription.isActive) {
-            subscription.isActive = false;
-            await subscription.save();
-        }
-
         res.json({
             plan: subscription.plan,
             planId: subscription.planId,
             maxClients: subscription.maxClients || 30,
             currentClients,
             isActive: subscription.isActive,
-            isExpired,
             startDate: subscription.startDate,
-            endDate: subscription.endDate,
             amount: subscription.amount || 0,
         });
 
@@ -120,8 +108,6 @@ router.post('/activate', auth, async (req, res) => {
         let subscription = await Subscription.findOne({ user: req.user.userId });
 
         const now = new Date();
-        const endDate = new Date(now);
-        endDate.setMonth(endDate.getMonth() + payment.durationMonths);
 
         if (subscription) {
             // Renew / upgrade existing
@@ -130,7 +116,6 @@ router.post('/activate', auth, async (req, res) => {
             subscription.maxClients = payment.customerLimit;
             subscription.amount = payment.amount;
             subscription.startDate = now;
-            subscription.endDate = endDate;
             subscription.isActive = true;
             subscription.razorpayPaymentId = payment.razorpayPaymentId;
         } else {
@@ -141,7 +126,6 @@ router.post('/activate', auth, async (req, res) => {
                 maxClients: payment.customerLimit,
                 amount: payment.amount,
                 startDate: now,
-                endDate,
                 isActive: true,
                 razorpayPaymentId: payment.razorpayPaymentId,
             });
@@ -163,7 +147,6 @@ router.post('/activate', auth, async (req, res) => {
                     planName: subscription.plan,
                     amount: subscription.amount,
                     maxClients: subscription.maxClients,
-                    endDate: subscription.endDate,
                     razorpayOrderId: razorpayOrderId,
                 }).catch(mailErr => {
                     console.error('[Subscription] Email send failed (non-fatal):', mailErr.message);
@@ -180,7 +163,6 @@ router.post('/activate', auth, async (req, res) => {
                 plan: subscription.plan,
                 planId: subscription.planId,
                 isActive: subscription.isActive,
-                endDate: subscription.endDate,
                 maxClients: subscription.maxClients,
                 amount: subscription.amount,
             },

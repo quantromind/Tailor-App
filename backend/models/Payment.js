@@ -28,7 +28,6 @@ const paymentSchema = new mongoose.Schema(
     planId: { type: String, default: null },
     planName: { type: String, required: true, default: 'Order Payment' },
     customerLimit: { type: Number, default: 0 },
-    durationMonths: { type: Number, default: 0 },
 
     // Amounts in INR (rupees), not paise, for readability in the DB.
     subtotal: { type: Number, required: true },

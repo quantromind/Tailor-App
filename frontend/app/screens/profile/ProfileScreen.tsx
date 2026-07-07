@@ -352,17 +352,6 @@ export default function ProfileScreen({ navigation, onLogout }: any) {
             </View>
           </View>
 
-          {subStatus?.isActive && subStatus?.endDate && (
-            <View style={styles.infoRow}>
-              <View style={styles.iconCircle}>
-                <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Valid Until</Text>
-                <Text style={styles.value}>{new Date(subStatus.endDate).toLocaleDateString()}</Text>
-              </View>
-            </View>
-          )}
 
           {!subStatus?.isActive && (
             <AnimatedPressable 

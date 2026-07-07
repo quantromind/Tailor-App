@@ -15,7 +15,6 @@ export interface Plan {
   features: string[];
   popular: boolean;
   contactSales: boolean;
-  durationMonths: number;
   pricing: PlanPricing | null;
 }
 
@@ -25,9 +24,7 @@ export interface SubscriptionStatus {
   maxClients: number;
   currentClients: number;
   isActive: boolean;
-  isExpired: boolean;
   startDate?: string;
-  endDate?: string;
   amount?: number;
 }
 

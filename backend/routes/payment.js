@@ -39,7 +39,7 @@ function getRazorpay() {
 router.post('/create-order', auth, async (req, res) => {
     const { planId, amount, description } = req.body;
 
-    let purpose, subtotal, gst, total, planName, customerLimit, durationMonths;
+    let purpose, subtotal, gst, total, planName, customerLimit;
 
     if (planId) {
         const plan = getPlanById(planId);
@@ -53,7 +53,6 @@ router.post('/create-order', auth, async (req, res) => {
         ({ subtotal, gst, total } = calculatePricing(plan));
         planName = plan.name;
         customerLimit = plan.customerLimit;
-        durationMonths = plan.durationMonths;
     } else if (amount) {
         if (typeof amount !== 'number' || amount <= 0) {
             return res.status(400).json({ message: 'Valid amount is required' });
@@ -64,7 +63,6 @@ router.post('/create-order', auth, async (req, res) => {
         total = amount;
         planName = description || 'Order Payment';
         customerLimit = 0;
-        durationMonths = 0;
     } else {
         return res.status(400).json({ message: 'Either planId or amount is required' });
     }
@@ -87,7 +85,6 @@ router.post('/create-order', auth, async (req, res) => {
             planId: planId || null,
             planName,
             customerLimit,
-            durationMonths,
             subtotal,
             gst,
             amount: total,

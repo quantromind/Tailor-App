@@ -18,7 +18,6 @@ const PLANS = [
     name: 'Starter',
     customerLimit: 100,
     price: 999, // base price per month, in INR (GST added on top)
-    durationMonths: 1,
     tagline: 'Perfect for solo tailors just getting started',
     features: [
       'Up to 100 clients',
@@ -35,7 +34,6 @@ const PLANS = [
     name: 'Growth',
     customerLimit: 500,
     price: 2499,
-    durationMonths: 1,
     tagline: 'For growing boutiques with a steady client base',
     features: [
       'Up to 500 clients',
@@ -52,7 +50,6 @@ const PLANS = [
     name: 'Professional',
     customerLimit: 1000,
     price: 4999,
-    durationMonths: 1,
     tagline: 'For established shops managing high volume',
     features: [
       'Up to 1000 clients',
@@ -69,7 +66,6 @@ const PLANS = [
     name: 'Unlimited',
     customerLimit: UNLIMITED_SENTINEL,
     price: 9999,
-    durationMonths: 1,
     tagline: 'Unlimited clients for large tailoring businesses',
     features: [
       'Unlimited clients',

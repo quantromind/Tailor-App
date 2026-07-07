@@ -40,7 +40,6 @@ async function sendSubscriptionConfirmation(opts) {
         planName,
         amount,
         maxClients,
-        endDate,
         razorpayOrderId,
     } = opts;
 
@@ -49,10 +48,6 @@ async function sendSubscriptionConfirmation(opts) {
         console.warn('[Mailer] ADMIN_EMAIL not set. Skipping email.');
         return;
     }
-
-    const formattedDate = endDate
-        ? new Date(endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
-        : 'N/A';
 
     const formattedAmount = `₹${Number(amount).toFixed(2)}`;
 
@@ -123,14 +118,6 @@ async function sendSubscriptionConfirmation(opts) {
                   </td>
                   <td align="right" style="padding:12px 0;border-bottom:1px solid #E4E9D9;">
                     <strong style="color:#1B2621;font-size:14px;">${maxClients >= 1000000 ? 'Unlimited' : maxClients} clients</strong>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:12px 0;border-bottom:1px solid #E4E9D9;">
-                    <span style="color:#6B705C;font-size:13px;">Valid Until</span>
-                  </td>
-                  <td align="right" style="padding:12px 0;border-bottom:1px solid #E4E9D9;">
-                    <strong style="color:#1B2621;font-size:14px;">${formattedDate}</strong>
                   </td>
                 </tr>
                 <tr>
