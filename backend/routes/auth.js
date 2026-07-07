@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -57,6 +58,39 @@ router.post('/login', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Update Profile API
+router.put('/profile', auth, async (req, res) => {
+    const { name, companyName, email, profileImage } = req.body;
+
+    try {
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (name) user.name = name;
+        if (companyName !== undefined) user.companyName = companyName;
+        if (email !== undefined) user.email = email;
+        if (profileImage !== undefined) user.profileImage = profileImage;
+
+        await user.save();
+
+        res.json({
+            message: 'Profile updated successfully',
+            user: {
+                userId: user._id,
+                name: user.name,
+                companyName: user.companyName,
+                email: user.email,
+                profileImage: user.profileImage
+            }
+        });
+    } catch (err) {
+        console.error('[Auth] Error updating profile:', err.message);
+        res.status(500).json({ message: 'Server error while updating profile' });
     }
 });
 

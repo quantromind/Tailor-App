@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    profileImage: {
+        type: String, // To store base64 image data
+        default: ''
+    },
     password: {
         type: String,
         required: true

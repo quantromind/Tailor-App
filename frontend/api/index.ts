@@ -1,5 +1,5 @@
 // Central export for all API modules
-export { registerUser, loginUser } from './auth';
+export { registerUser, loginUser, updateProfile } from './auth';
 export { createCustomer, getCustomers, getCustomerById, searchCustomers } from './customer';
 export { getDesignsByCategory, getAllDesignsByCategory, getMyDesigns, createCustomDesign } from './design';
 export { createOrder, getOrders, getOrderById, updateOrderStatus } from './order';

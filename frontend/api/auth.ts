@@ -18,3 +18,13 @@ export const loginUser = async (data: {
   const response = await API.post('/auth/login', data);
   return response.data;
 };
+
+export const updateProfile = async (data: {
+  name?: string;
+  companyName?: string;
+  email?: string;
+  profileImage?: string;
+}) => {
+  const response = await API.put('/auth/profile', data);
+  return response.data;
+};
