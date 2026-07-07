@@ -189,12 +189,43 @@ export default function SubscriptionScreen({ navigation }: any) {
             <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
             <Text style={styles.currentPlanText}>
               You're on the <Text style={{ fontFamily: Typography.bold }}>{currentStatus.plan}</Text> plan
-              {currentStatus.endDate ? ` · renews ${new Date(currentStatus.endDate).toLocaleDateString()}` : ''}
             </Text>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Select a Plan</Text>
+        {currentStatus?.isActive && currentStatus.planId && (
+          <>
+            <Text style={styles.sectionTitle}>Current Plan</Text>
+            {plans
+              .filter((p) => p.id === currentStatus.planId)
+              .map((plan) => (
+                <View key={`current-${plan.id}`} style={[styles.planCard, styles.planCardCurrent]}>
+                  <View style={styles.currentBadge}>
+                    <Text style={styles.currentBadgeText}>Active</Text>
+                  </View>
+                  <View style={styles.planHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.planName}>{plan.name}</Text>
+                      <Text style={styles.planLimit}>Up to {formatLimit(plan.customerLimit)} clients</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.planDesc}>{plan.tagline}</Text>
+                  <View style={styles.featuresList}>
+                    {plan.features.map((f, i) => (
+                      <View key={i} style={styles.featureRow}>
+                        <Ionicons name="checkmark" size={14} color={Colors.success} />
+                        <Text style={styles.featureText}>{f}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+          </>
+        )}
+
+        <Text style={[styles.sectionTitle, { marginTop: currentStatus?.isActive ? 16 : 0 }]}>
+          {currentStatus?.isActive ? 'Upgrade Options' : 'Select a Plan'}
+        </Text>
 
         {plansLoading ? (
           <ListSkeleton rows={4} />
@@ -207,9 +238,10 @@ export default function SubscriptionScreen({ navigation }: any) {
             onAction={loadData}
           />
         ) : (
-          plans.map((plan) => {
+          plans
+            .filter((plan) => !isCurrentPlan(plan)) // Exclude current plan from upgrades
+            .map((plan) => {
             const active = selectedPlan?.id === plan.id;
-            const current = isCurrentPlan(plan);
             return (
               <AnimatedPressable
                 key={plan.id}
@@ -221,11 +253,6 @@ export default function SubscriptionScreen({ navigation }: any) {
                   <View style={styles.popularBadge}>
                     <Ionicons name="star" size={11} color="#FFFFFF" />
                     <Text style={styles.popularBadgeText}>Most Popular</Text>
-                  </View>
-                )}
-                {current && (
-                  <View style={styles.currentBadge}>
-                    <Text style={styles.currentBadgeText}>Current Plan</Text>
                   </View>
                 )}
 
@@ -265,12 +292,11 @@ export default function SubscriptionScreen({ navigation }: any) {
           })
         )}
 
-        {/* Payment Summary */}
-        {selectedPlan && !selectedPlan.contactSales && pricing && (
+        {selectedPlan && !selectedPlan.contactSales && pricing && !isCurrentPlan(selectedPlan) && (
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>Payment Summary</Text>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{selectedPlan.name} Plan (1 month)</Text>
+              <Text style={styles.summaryLabel}>{selectedPlan.name} Plan</Text>
               <Text style={styles.summaryValue}>₹{pricing.subtotal}</Text>
             </View>
             <View style={styles.summaryRow}>
@@ -285,14 +311,14 @@ export default function SubscriptionScreen({ navigation }: any) {
           </View>
         )}
 
-        {selectedPlan && (
+        {selectedPlan && !isCurrentPlan(selectedPlan) && (
           <AnimatedPressable style={styles.subscribeBtn} onPress={handleBuyNow} scaleTo={0.97}>
             <View style={styles.subscribeInner}>
               <Ionicons name={selectedPlan.contactSales ? 'call-outline' : 'flash'} size={18} color="#FFF" />
               <Text style={styles.subscribeText}>
                 {selectedPlan.contactSales
                   ? 'Contact Sales'
-                  : `Buy Now — ₹${selectedPlan.pricing?.total ?? ''}`}
+                  : `Upgrade Now — ₹${selectedPlan.pricing?.total ?? ''}`}
               </Text>
             </View>
           </AnimatedPressable>
@@ -338,6 +364,7 @@ const styles = StyleSheet.create({
     shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
   },
   planCardSelected: { borderColor: Colors.primary, backgroundColor: 'rgba(143, 163, 119, 0.06)' },
+  planCardCurrent: { borderColor: Colors.success, backgroundColor: Colors.successBg },
   popularBadge: {
     position: 'absolute', top: -10, left: 18, flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: Colors.gold, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
