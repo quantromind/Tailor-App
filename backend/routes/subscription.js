@@ -76,6 +76,7 @@ router.get('/current', auth, getStatusHandler);
 // This means a client can never activate a plan it did not actually pay for.
 router.post('/activate', auth, async (req, res) => {
     const { razorpayOrderId } = req.body;
+    console.log(`[Activate] Called for order: ${razorpayOrderId}, user: ${req.user.userId}`);
 
     if (!razorpayOrderId) {
         return res.status(400).json({ message: 'razorpayOrderId is required' });
@@ -85,8 +86,11 @@ router.post('/activate', auth, async (req, res) => {
         const payment = await Payment.findOne({ razorpayOrderId, user: req.user.userId });
 
         if (!payment) {
+            console.warn(`[Activate] No payment found for order: ${razorpayOrderId}`);
             return res.status(404).json({ message: 'Payment record not found for this order' });
         }
+        console.log(`[Activate] Payment found — status: ${payment.status}, purpose: ${payment.purpose}, activated: ${payment.subscriptionActivated}`);
+
         if (payment.purpose !== 'subscription') {
             return res.status(400).json({ message: 'This payment is not a subscription purchase' });
         }
@@ -97,7 +101,26 @@ router.post('/activate', auth, async (req, res) => {
         // Idempotency guard: a single payment can only ever activate a
         // subscription once, even if the client retries this call.
         if (payment.subscriptionActivated) {
+            console.log(`[Activate] Already activated — sending email again for idempotent call`);
             const existing = await Subscription.findOne({ user: req.user.userId });
+            // Still send email in case it was missed the first time
+            const user = await User.findById(req.user.userId);
+            const currentClients = await Customer.countDocuments({ createdBy: req.user.userId });
+            if (user && existing) {
+                sendSubscriptionConfirmation({
+                    userName: user.name,
+                    companyName: user.companyName,
+                    userEmail: user.email,
+                    userPhone: user.phone,
+                    planName: existing.plan,
+                    amount: existing.amount,
+                    maxClients: existing.maxClients,
+                    currentClients,
+                    isActive: existing.isActive,
+                    startDate: existing.startDate,
+                    razorpayOrderId,
+                }).catch(mailErr => console.error('[Activate] Email error (idempotent):', mailErr.message));
+            }
             return res.json({
                 success: true,
                 message: 'Subscription already activated for this payment',
@@ -132,36 +155,12 @@ router.post('/activate', auth, async (req, res) => {
         }
 
         await subscription.save();
+        console.log(`[Activate] Subscription saved — plan: ${subscription.plan}`);
 
         payment.subscriptionActivated = true;
         await payment.save();
 
-        // Send confirmation email (truly non-blocking — failure won't affect the response)
-        Promise.all([
-            User.findById(req.user.userId),
-            Customer.countDocuments({ createdBy: req.user.userId }),
-        ]).then(([user, currentClients]) => {
-            if (user) {
-                sendSubscriptionConfirmation({
-                    userName: user.name,
-                    companyName: user.companyName,
-                    userEmail: user.email,
-                    userPhone: user.phone,
-                    planName: subscription.plan,
-                    amount: subscription.amount,
-                    maxClients: subscription.maxClients,
-                    currentClients,
-                    isActive: subscription.isActive,
-                    startDate: subscription.startDate,
-                    razorpayOrderId: razorpayOrderId,
-                }).catch(mailErr => {
-                    console.error('[Subscription] Email send failed (non-fatal):', mailErr.message);
-                });
-            }
-        }).catch(err => {
-            console.error('[Subscription] Error fetching data for email:', err.message);
-        });
-
+        // Respond immediately so the app doesn't wait on email
         res.json({
             success: true,
             message: 'Subscription activated successfully',
@@ -173,6 +172,36 @@ router.post('/activate', auth, async (req, res) => {
                 amount: subscription.amount,
             },
         });
+
+        // Send confirmation emails AFTER responding (non-blocking)
+        console.log('[Activate] Sending confirmation emails...');
+        try {
+            const [user, currentClients] = await Promise.all([
+                User.findById(req.user.userId),
+                Customer.countDocuments({ createdBy: req.user.userId }),
+            ]);
+            if (user) {
+                console.log(`[Activate] Sending email to admin and user: ${user.email || '(no email)'}`);
+                await sendSubscriptionConfirmation({
+                    userName: user.name,
+                    companyName: user.companyName,
+                    userEmail: user.email,
+                    userPhone: user.phone,
+                    planName: subscription.plan,
+                    amount: subscription.amount,
+                    maxClients: subscription.maxClients,
+                    currentClients,
+                    isActive: subscription.isActive,
+                    startDate: subscription.startDate,
+                    razorpayOrderId,
+                });
+                console.log('[Activate] ✅ Confirmation emails sent successfully');
+            } else {
+                console.warn('[Activate] User not found for email — skipping');
+            }
+        } catch (mailErr) {
+            console.error('[Activate] ❌ Email send failed:', mailErr.message);
+        }
 
     } catch (err) {
         console.error('[Subscription] Error activating subscription:', err);

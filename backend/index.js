@@ -29,7 +29,7 @@ app.use('/api/subscription', subscriptionRoutes); // singular alias to match RES
 
 app.get('/api/debug/test', (req, res) => {
     console.log('[DEBUG] Test endpoint reached!');
-    res.json({ 
+    res.json({
         message: 'Debug test success',
         version: '2.0.0',
         deployedAt: '2026-06-30',
@@ -39,8 +39,8 @@ app.get('/api/debug/test', (req, res) => {
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // Global error handler — catches PayloadTooLargeError and other unhandled Express errors
 // so the server never crashes on a single bad request.
