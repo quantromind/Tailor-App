@@ -137,7 +137,10 @@ router.post('/activate', auth, async (req, res) => {
         await payment.save();
 
         // Send confirmation email (truly non-blocking — failure won't affect the response)
-        User.findById(req.user.userId).then(user => {
+        Promise.all([
+            User.findById(req.user.userId),
+            Customer.countDocuments({ createdBy: req.user.userId }),
+        ]).then(([user, currentClients]) => {
             if (user) {
                 sendSubscriptionConfirmation({
                     userName: user.name,
@@ -147,13 +150,16 @@ router.post('/activate', auth, async (req, res) => {
                     planName: subscription.plan,
                     amount: subscription.amount,
                     maxClients: subscription.maxClients,
+                    currentClients,
+                    isActive: subscription.isActive,
+                    startDate: subscription.startDate,
                     razorpayOrderId: razorpayOrderId,
                 }).catch(mailErr => {
                     console.error('[Subscription] Email send failed (non-fatal):', mailErr.message);
                 });
             }
         }).catch(err => {
-            console.error('[Subscription] Error fetching user for email:', err.message);
+            console.error('[Subscription] Error fetching data for email:', err.message);
         });
 
         res.json({
