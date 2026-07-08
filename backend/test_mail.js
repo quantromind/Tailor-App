@@ -1,37 +1,51 @@
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+const mongoose = require('mongoose');
+const User = require('./models/User');
+const Subscription = require('./models/Subscription');
+const { sendSubscriptionConfirmation } = require('./utils/mailer');
 
-console.log('MAIL_USER:', process.env.MAIL_USER);
-console.log('MAIL_PASS:', process.env.MAIL_PASS ? `${process.env.MAIL_PASS.length} chars` : 'NOT SET');
-console.log('ADMIN_EMAIL:', process.env.ADMIN_EMAIL);
+async function test() {
+    try {
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log('✅ MongoDB connected');
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
-    },
-});
+        // Find the most recent user with a subscription
+        const sub = await Subscription.findOne({ isActive: true }).sort({ startDate: -1 });
+        if (!sub) {
+            console.log('⚠️  No active subscription found in DB');
+            process.exit(0);
+        }
+        const user = await User.findById(sub.user);
+        if (!user) {
+            console.log('⚠️  No user found for subscription');
+            process.exit(0);
+        }
 
-transporter.verify((error, success) => {
-    if (error) {
-        console.error('❌ Gmail auth FAILED:', error.message);
-        console.error('Full error:', error);
-    } else {
-        console.log('✅ Gmail auth SUCCESS — sending test email...');
+        console.log('👤 User:', { name: user.name, email: user.email || '(EMPTY)', phone: user.phone });
+        console.log('📋 Subscription:', { plan: sub.plan, amount: sub.amount, maxClients: sub.maxClients });
 
-        transporter.sendMail({
-            from: `"eTailoring App" <${process.env.MAIL_USER}>`,
-            to: process.env.ADMIN_EMAIL,
-            subject: '✅ Test Email — eTailoring Mailer Working',
-            html: `<h2>Email system is working!</h2><p>If you see this, the mailer is correctly configured.</p>`,
-        }, (err, info) => {
-            if (err) {
-                console.error('❌ Send FAILED:', err.message);
-            } else {
-                console.log('✅ Email sent! Message ID:', info.messageId);
-                console.log('Accepted by:', info.accepted);
-            }
+        console.log('\nSending confirmation email...');
+        await sendSubscriptionConfirmation({
+            userName: user.name,
+            companyName: user.companyName,
+            userEmail: user.email,
+            userPhone: user.phone,
+            planName: sub.plan,
+            amount: sub.amount,
+            maxClients: sub.maxClients,
+            currentClients: 5, // example
+            isActive: sub.isActive,
+            startDate: sub.startDate,
+            razorpayOrderId: 'test_order_manual',
         });
+
+        console.log('✅ Done — check quantromind@gmail.com inbox (and spam)');
+    } catch (err) {
+        console.error('❌ Error:', err.message);
+    } finally {
+        await mongoose.disconnect();
+        process.exit(0);
     }
-});
+}
+
+test();
