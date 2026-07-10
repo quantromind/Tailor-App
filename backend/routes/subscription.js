@@ -160,20 +160,7 @@ router.post('/activate', auth, async (req, res) => {
         payment.subscriptionActivated = true;
         await payment.save();
 
-        // Respond immediately so the app doesn't wait on email
-        res.json({
-            success: true,
-            message: 'Subscription activated successfully',
-            subscription: {
-                plan: subscription.plan,
-                planId: subscription.planId,
-                isActive: subscription.isActive,
-                maxClients: subscription.maxClients,
-                amount: subscription.amount,
-            },
-        });
-
-        // Send confirmation emails AFTER responding (non-blocking)
+        // Send confirmation emails BEFORE responding to ensure they are dispatched
         console.log('[Activate] Sending confirmation emails...');
         try {
             const [user, currentClients] = await Promise.all([
@@ -202,6 +189,18 @@ router.post('/activate', auth, async (req, res) => {
         } catch (mailErr) {
             console.error('[Activate] ❌ Email send failed:', mailErr.message);
         }
+
+        res.json({
+            success: true,
+            message: 'Subscription activated successfully',
+            subscription: {
+                plan: subscription.plan,
+                planId: subscription.planId,
+                isActive: subscription.isActive,
+                maxClients: subscription.maxClients,
+                amount: subscription.amount,
+            },
+        });
 
     } catch (err) {
         console.error('[Subscription] Error activating subscription:', err);

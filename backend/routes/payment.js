@@ -201,11 +201,12 @@ router.post('/failure', auth, async (req, res) => {
             payment.failureReason = reason || 'Payment cancelled or failed on client';
             await payment.save();
 
-            // Send failure email (truly non-blocking)
+            // Send failure email before responding
             if (payment.purpose === 'subscription') {
-                User.findById(req.user.userId).then(user => {
+                try {
+                    const user = await User.findById(req.user.userId);
                     if (user) {
-                        sendSubscriptionFailure({
+                        await sendSubscriptionFailure({
                             userName: user.name,
                             companyName: user.companyName,
                             userEmail: user.email,
@@ -214,11 +215,11 @@ router.post('/failure', auth, async (req, res) => {
                             amount: payment.amount,
                             razorpayOrderId: razorpay_order_id,
                             failureReason: payment.failureReason,
-                        }).catch(mailErr => {
-                            console.error('[Payment] Failed to send failure email:', mailErr.message);
                         });
                     }
-                }).catch(err => console.error('[Payment] Error fetching user for failure email:', err.message));
+                } catch (err) {
+                    console.error('[Payment] Error fetching user or sending failure email:', err.message);
+                }
             }
         }
         res.json({ success: true });
